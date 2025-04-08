@@ -75,7 +75,7 @@ const data = {
         },
         {
           title: "User details",
-          url: "u",
+          url: "userdetail",
         },
       ],
     },
@@ -90,7 +90,7 @@ const data = {
         },
         {
           title: "Admin Service",
-          url: "adminservice",
+          url: "/admin/adminservice",
         },
       ],
     },
@@ -163,7 +163,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           toggleDropdown: () => toggleDropdown(item.title),
           items: item.items.map((subItem) => ({
             ...subItem,
-            isActive: isClient && activePath === `/admin${subItem.url}`, // Prepend /admin dynamically
+            isActive: isClient && activePath === `/admin/${subItem.url}`, // Prepend /admin dynamically
           })),
         };
       }),

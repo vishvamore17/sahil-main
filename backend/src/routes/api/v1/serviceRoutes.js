@@ -32,5 +32,6 @@
     router.get("/getServiceById/:serviceId", 
         ServiceController.getServiceById);
 
+    router.post("/sendMail",ServiceController.sendCertificateNotification)
 
     module.exports = router;

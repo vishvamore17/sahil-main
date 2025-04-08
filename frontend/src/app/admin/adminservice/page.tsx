@@ -282,26 +282,32 @@ export default function GenerateService() {
             if (isEditMode) {
                 response = await axios.put(
                     `http://localhost:5000/api/v1/services/update/${serviceId}`,
-                    submissionData,
-                    {
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    }
+                    submissionData
                 );
             } else {
                 response = await axios.post(
                     "http://localhost:5000/api/v1/services/generateServices",
-                    submissionData,
-                    {
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    }
+                    submissionData
                 );
             }
-
+    
             setService(response.data);
+            
+            // Send email notification after successful generation/update
+            try {
+                await axios.post("http://localhost:5000/api/v1/services/sendMail", {
+                    serviceId: response.data.serviceId
+                });
+            } catch (emailError) {
+                console.error("Email notification failed:", emailError);
+                // Don't fail the whole operation if email fails
+                toast({
+                    title: "Warning",
+                    description: "Service created but email notification failed",
+                    variant: "default",
+                });
+            }
+    
             toast({
                 title: "Success",
                 description: isEditMode
@@ -309,31 +315,24 @@ export default function GenerateService() {
                     : "Service request created successfully!",
                 variant: "default",
             });
-
+    
             if (isEditMode) {
                 router.push("/admincertificatetable");
             }
         } catch (err: any) {
-            console.error("Error:", err.response?.data || err.message);
-            setError(err.response?.data?.error ||
-                (isEditMode ? "Failed to update service" : "Failed to generate service"));
-            toast({
-                title: "Error",
-                description: err.response?.data?.error ||
-                    (isEditMode ? "Failed to update service" : "Failed to generate service"),
-                variant: "destructive",
-            });
+            // ... (keep your existing error handling)
         } finally {
             setLoading(false);
         }
     };
+
 
     const handleDownload = async () => {
         if (!service?.downloadUrl) return;
 
         try {
             const response = await axios.get(
-                `http://localhost:5000${service.downloadUrl}`,
+                `http://localhost:5000/${service.downloadUrl}`,
                 { responseType: 'blob' }
             );
 
