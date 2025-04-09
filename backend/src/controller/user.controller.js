@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const Admin = require('../model/admin.model');
 const Users = require('../model/user.model');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
@@ -252,8 +253,8 @@ const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
   try {
-    // Always return success to prevent email enumeration
-    const user = await Users.findOne({ email });
+    // Check both User and Admin collections
+    const user = await Users.findOne({ email }) || await Admin.findOne({ email });
 
     if (user) {
       const token = createToken(user._id, { expiresIn: '1h' });
@@ -271,7 +272,7 @@ const forgotPassword = async (req, res) => {
       });
     }
 
-    // Return same response whether user exists or not
+    // Return same response whether user exists or not (security best practice)
     res.json({
       success: true,
       message: "If an account exists with this email, you'll receive a password reset link."
@@ -386,24 +387,34 @@ const resetPassword = async (req, res) => {
   const { password } = req.body;
 
   try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const user = await Users.findById(decoded.id);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Check both collections for the user
+    let user = await Users.findById(decoded.id);
+    if (!user) {
+      user = await Admin.findById(decoded.id);
+    }
 
-      if (!user) {
-          return res.status(400).json({ success: false, message: "Invalid or expired token" });
-      }
+    if (!user) {
+      return res.status(400).json({ success: false, message: "Invalid or expired token" });
+    }
 
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(password, salt);
-      user.resetPasswordToken = undefined;
-      user.resetPasswordExpires = undefined;
-      await user.save();
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
 
-      return res.json({ success: true, message: "Password reset successfully", email: user.email });
+    return res.json({ 
+      success: true, 
+      message: "Password reset successfully", 
+      email: user.email,
+      userType: user instanceof Users ? 'user' : 'admin' // Indicate which type of user was reset
+    });
 
   } catch (error) {
-      console.error("Reset Password Error:", error);
-      return res.status(500).json({ success: false, message: "Server error" });
+    console.error("Reset Password Error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
