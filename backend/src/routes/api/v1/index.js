@@ -13,7 +13,7 @@ const contactPersonRoutes = require("./contactperson.routs");
 const serviceEngineerRoutes = require("./serviceEngineerRouter");
 
 router.use("/certificates", certificateRoutes);
-router.use("/services", serviceRoutes);
+router.use("/servirces", serviceRoutes);
 router.use("/users", userRoutes);
 router.use("/admin", adminRoutes);
 router.use("/addcategory", addCategoryRoutes);

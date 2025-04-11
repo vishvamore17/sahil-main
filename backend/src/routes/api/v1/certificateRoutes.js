@@ -26,10 +26,8 @@ router.get(
     CertificateController.getCertificatById
 );
 
-router.get(
-    "/download/:certificateId", 
-    CertificateController.downloadCertificate
-);
+router.get("/download/:certificateId", CertificateController.downloadCertificate);
+
 
 router.put(
     "/updateCertificate/:certificateId", 
