@@ -88,7 +88,7 @@ export function LoginForm() {
 
       if (userResponse.ok) {
         localStorage.setItem("userId", userData.user.id);
-        localStorage.setItem("authToken", userData.token);
+        localStorage.setItem("authToken", userData.accessToken);
         
         toast({
           title: "Login successful",
@@ -108,7 +108,7 @@ export function LoginForm() {
       const adminData = await adminResponse.json();
 
       if (adminResponse.ok) {
-        localStorage.setItem("authToken", adminData.token);
+        localStorage.setItem("authToken", adminData.accessToken);
         localStorage.setItem("adminId", adminData.adminId);
         localStorage.setItem("adminEmail", adminData.email);
 

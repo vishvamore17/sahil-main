@@ -75,7 +75,7 @@ const data = {
         },
         {
           title: "User details",
-          url: "userdetail",
+          url: "/admin/userdetail",
         },
       ],
     },

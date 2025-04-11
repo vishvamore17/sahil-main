@@ -398,63 +398,78 @@ export default function GenerateService() {
     };
 
     const handleDownload = async () => {
+        const yourAccessToken = localStorage.getItem("authToken");
+        const userRole = localStorage.getItem("authRole"); // <-- Make sure this is saved at login
+    
         if (!service?.serviceId) {
-          toast({
-            title: "Error",
-            description: "No service ID available",
-            variant: "destructive",
-          });
-          return;
+            toast({
+                title: "Error",
+                description: "No service ID available",
+                variant: "destructive",
+            });
+            return;
         }
-      
+    
         try {
-          // Show loading state
-          setIsGeneratingPDF(true);
-          
-          // First ensure the PDF exists by calling the generate endpoint
-          await axios.get(`http://localhost:5000/api/v1/services/download/${service.serviceId}`, {
-            params: { ensure: true }, // Add this parameter to your backend
-            headers: {
-              'Cache-Control': 'no-cache'
+            setIsGeneratingPDF(true);
+    
+            // Step 1: Download the PDF
+            const response = await axios.get(
+                `http://localhost:5000/api/v1/services/download/${service.serviceId}`,
+                {
+                    responseType: 'blob',
+                    headers: {
+                        'Authorization': `Bearer ${yourAccessToken}`
+                    }
+                }
+            );
+    
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `service-${service.serviceId}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode?.removeChild(link);
+            window.URL.revokeObjectURL(url);
+    
+            // Step 2: Only admins send the email
+            if (userRole === 'admin') {
+                await axios.post(
+                    'http://localhost:5000/api/v1/services/sendMail',
+                    { serviceId: service.serviceId },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${yourAccessToken}`
+                        }
+                    }
+                );
+    
+                toast({
+                    title: "Success",
+                    description: "Certificate downloaded and email sent successfully",
+                    variant: "default",
+                });
+            } else {
+                toast({
+                    title: "Downloaded",
+                    description: "Certificate downloaded successfully",
+                    variant: "default",
+                });
             }
-          });
-      
-          // Then download it
-          const timestamp = new Date().getTime();
-          const downloadUrl = `http://localhost:5000/api/v1/services/download/${service.serviceId}?t=${timestamp}`;
-          
-          // Open in new tab to avoid issues with popup blockers
-          window.open(downloadUrl, '_blank');
-          
-          // Send notification email
-          try {
-            await axios.post('http://localhost:5000/api/v1/services/sendMail', {
-              serviceId: service.serviceId
-            });
-            toast({
-              title: "Success",
-              description: "Certificate downloaded and notification sent!",
-              variant: "default",
-            });
-          } catch (emailError) {
-            console.error("Email error:", emailError);
-            toast({
-              title: "Downloaded",
-              description: "Certificate downloaded but notification failed",
-              variant: "default",
-            });
-          }
+    
         } catch (err) {
-          console.error("Download failed:", err);
-          toast({
-            title: "Error",
-            description: err.response?.data?.message || "Failed to download certificate",
-            variant: "destructive",
-          });
+            console.error("Error:", err);
+            toast({
+                title: "Error",
+                description: err.response?.data?.error || "Failed to download certificate",
+                variant: "destructive",
+            });
         } finally {
-          setIsGeneratingPDF(false);
+            setIsGeneratingPDF(false);
         }
-      };
+    };
+    
 
     return (
         <SidebarProvider>
