@@ -1,13 +1,6 @@
 const express = require("express");
 const { CertificateController } = require("../../../controller");
-// const { 
-//     createCertificate, 
-//     getCertificate, 
-//     updateCertificate,
-//     deleteCertificate,
-//     getCertificatById,
-//     downloadCertificate
-// } = require("../../../controller");
+
 
 const router = express.Router();
 
@@ -26,8 +19,10 @@ router.get(
     CertificateController.getCertificatById
 );
 
-router.get("/download/:certificateId", CertificateController.downloadCertificate);
-
+router.get(
+    "/downloadCertificate/:certificateId", 
+    CertificateController.downloadCertificate
+);
 
 router.put(
     "/updateCertificate/:certificateId", 

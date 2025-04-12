@@ -253,7 +253,6 @@ export default function GenerateCertificate() {
   
       // const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
-  
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `certificate-${certificate.certificateId}.pdf`);

@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { CalendarIcon, Edit, Trash2, Loader2, PlusCircle, SearchIcon, ChevronDownIcon, Printer, FileDown } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -56,24 +56,24 @@ const formatDate = (dateString: string): string => {
 };
 
 const columns = [
-  { name: "CERTIFICATE NO", uid: "certificateNo", sortable: true, width: "120px" },
-  { name: "CUSTOMER", uid: "customerName", sortable: true, width: "120px" },
-  { name: "SITE LOCATION", uid: "siteLocation", sortable: true, width: "120px" },
-  { name: "MAKE MODEL", uid: "makeModel", sortable: true, width: "120px" },
+  { name: "Certificate No", uid: "certificateNo", sortable: true, width: "120px" },
+  { name: "Customer", uid: "customerName", sortable: true, width: "120px" },
+  { name: "Site Location", uid: "siteLocation", sortable: true, width: "120px" },
+  { name: "Make Model", uid: "makeModel", sortable: true, width: "120px" },
   // { name: "RANGE", uid: "range", sortable: true, width: "120px" },
-  { name: "SERIAL NO", uid: "serialNo", sortable: true, width: "120px" },
+  { name: "Serial No", uid: "serialNo", sortable: true, width: "120px" },
   // { name: "CALIBRATION GAS", uid: "calibrationGas", sortable: true, width: "120px" },
   // { name: "GAS CANISTER DETAILS", uid: "gasCanisterDetails", sortable: true, width: "120px" },
   // { name: "DATE OF CALIBRATION", uid: "dateOfCalibration", sortable: true, width: "120px" },
   // { name: "CALIBRATION DUE DATE", uid: "calibrationDueDate", sortable: true, width: "120px" },
-  { name: "ENGINEER NAME", uid: "engineerName", sortable: true, width: "120px" },
+  { name: "Engineer Name", uid: "engineerName", sortable: true, width: "120px" },
 
-  { name: "ACTION", uid: "actions", sortable: true, width: "100px" },
+  { name: "Action", uid: "actions", sortable: true, width: "100px" },
 ];
 const INITIAL_VISIBLE_COLUMNS = ["certificateNo", "customerName", "siteLocation", "makeModel", "range", "serialNo", "calibrationGas", "gasCanisterDetails", "dateOfCalibration", "calibrationDueDate", "engineerName", "actions"];
 
 
-export default function Certificatetable() {
+export default function CertificateTable() {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [certificate, setCertificate] = useState<CertificateResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -200,45 +200,83 @@ export default function Certificatetable() {
   const handleDownload = async (certificateId: string) => {
     try {
       setIsDownloading(certificateId);
-      
-      const response = await axios.get(
-        `http://localhost:5000/api/v1/certificates/download/${certificateId}`,
-        { 
+      console.log('Attempting to download certificate:', certificateId);
+
+      // Download the PDF
+      const pdfResponse = await axios.get(
+        `http://localhost:5000/api/v1/certificates/downloadCertificate/${certificateId}`,
+        {
           responseType: 'blob',
+          headers: {
+            "Authorization": `Bearer ${localStorage.getItem("token")}`,
+            "Accept": "application/pdf"
+          }
         }
       );
-  
-      // Create blob URL
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      
+
+      // Create blob from response
+      const blob = new Blob([pdfResponse.data], { type: 'application/pdf' });
+
       // Create download link
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `certificate-${certificateId}.pdf`);
-      
-      // Trigger download
+
+      // Try to get filename from headers or use default
+      const contentDisposition = pdfResponse.headers['content-disposition'];
+      let filename = `certificate-${certificateId}.pdf`;
+
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
-      
-      // Clean up
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
+
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
+      toast({
+        title: "Success",
+        description: "Certificate downloaded successfully",
+        variant: "default",
+      });
     } catch (err) {
-      console.error("Download error:", err);
+      console.error('Download error:', err);
+      let errorMessage = "Failed to download certificate. Please try again.";
+
+      if (axios.isAxiosError(err)) {
+        console.error('Error details:', {
+          status: err.response?.status,
+          data: err.response?.data,
+          url: err.config?.url
+        });
+
+        if (err.response?.status === 401) {
+          errorMessage = "Please login again to download the certificate.";
+        } else if (err.response?.status === 404) {
+          errorMessage = "Certificate not found.";
+        } else if (!navigator.onLine) {
+          errorMessage = "No internet connection. Please check your network.";
+        }
+      }
+
       toast({
         title: "Error",
-        description: "Failed to download certificate",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
       setIsDownloading(null);
     }
   };
-  
-
-
 
   const onNextPage = React.useCallback(() => {
     if (page < pages) {
@@ -269,77 +307,64 @@ export default function Certificatetable() {
   const onClear = React.useCallback(() => {
     setFilterValue("");
     setPage(1);
-  }, []);
-
-  const topContent = React.useMemo(() => {
+  }, []); const topContent = React.useMemo(() => {
     return (
-      <div className="flex flex-col gap-4">
-        <div className="flex justify-between gap-3 items-end">
-          <Input
-            isClearable
-            className="w-full sm:max-w-[80%]" // Full width on small screens, 44% on larger screens
-            placeholder="Search by name..."
-            startContent={<SearchIcon className="h-4 w-10 text-muted-foreground" />}
-            value={filterValue}
-            onChange={(e) => setFilterValue(e.target.value)}
-            onClear={() => setFilterValue("")}
-          />
-
-
-        </div>
-        <div className="flex justify-between items-center">
-          <span className="text-default-400 text-small">Total {certificates.length} certificates</span>
-          <label className="flex items-center text-default-400 text-small">
-            Rows per page:
-            <select
-              className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small"
-              onChange={onRowsPerPageChange}
-              defaultValue="15"
-            >
-              <option value="5">5</option>
-              <option value="10">10</option>
-              <option value="15">15</option>
-            </select>
-          </label>
-        </div>
+      <div className="flex justify-between items-center gap-4">
+        <Input
+          isClearable
+          className="w-full max-w-[300px]"
+          placeholder="Search by name or GST"
+          startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+          value={filterValue}
+          onChange={(e) => setFilterValue(e.target.value)}
+          onClear={() => setFilterValue("")}
+        />
+        <label className="flex items-center text-default-400 text-small">
+          Rows per page:
+          <select
+            className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
+            onChange={onRowsPerPageChange}
+            defaultValue="15"
+          >
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
+          </select>
+        </label>
       </div>
     );
-  }, [
-    filterValue,
-    statusFilter,
-    visibleColumns,
-    onRowsPerPageChange,
-    certificates.length,
-    onSearchChange,
-  ]);
+  }, [filterValue, onRowsPerPageChange, certificates.length, onSearchChange, visibleColumns]);
 
   const bottomContent = React.useMemo(() => {
     return (
-      <div className="py-2 px-2 flex justify-between items-center">
-        <span className="w-[30%] text-small text-default-400">
-
+      <div className="py-2 px-2 relative flex justify-between items-center">
+        <span className="text-default-400 text-small">
+          Total {certificates.length} certificates
         </span>
-        <Pagination
-          isCompact
-          // showControls
-          showShadow
-          color="success"
-          page={page}
-          total={pages}
-          onChange={setPage}
-          classNames={{
-            // base: "gap-2 rounded-2xl shadow-lg p-2 dark:bg-default-100",
-            cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
-            item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
-          }}
-        />
 
+        {/* Centered Pagination */}
+        <div className="absolute left-1/2 transform -translate-x-1/2">
+          <Pagination
+            isCompact
+            showShadow
+            color="success"
+            page={page}
+            total={pages}
+            onChange={setPage}
+            classNames={{
+              cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
+              item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
+            }}
+          />
+        </div>
+
+        {/* Navigation Buttons */}
         <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
           <Button
             className="bg-[hsl(339.92deg_91.04%_52.35%)]"
             variant="default"
             size="sm"
-            disabled={pages === 1} // Use the `disabled` prop
+            disabled={page === 1}
             onClick={onPreviousPage}
           >
             Previous
@@ -348,15 +373,15 @@ export default function Certificatetable() {
             className="bg-[hsl(339.92deg_91.04%_52.35%)]"
             variant="default"
             size="sm"
-            onClick={onNextPage} // Use `onClick` instead of `onPress`
+            disabled={page === pages}
+            onClick={onNextPage}
           >
             Next
           </Button>
-
         </div>
       </div>
     );
-  }, [selectedKeys, items.length, page, pages, hasSearchFilter]);
+  }, [selectedKeys, page, pages, onPreviousPage, onNextPage, items.length, hasSearchFilter]);
 
   const handleSelectionChange = (keys: Selection) => {
     if (keys === "all") {
@@ -370,40 +395,26 @@ export default function Certificatetable() {
     setVisibleColumns(keys);
   };
 
-  const renderCell = React.useCallback((certificate: Certificate, columnKey: string): React.ReactNode => {
-    const cellValue = certificate[columnKey];
-  
-    if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate") && cellValue) {
-      return formatDate(cellValue);
-    }
-  
+  const renderCell = useCallback((certificate: Certificate, columnKey: string) => {
     if (columnKey === "actions") {
       return (
         <div className="relative flex items-center gap-2">
-          <Tooltip content="Download Certificate">
-            <Button 
-              variant="ghost" 
-              size="icon"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleDownload(certificate._id);
-              }}
-              disabled={isDownloading === certificate._id}
-            >
-              {isDownloading === certificate._id ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileDown className="h-4 w-4" />
-              )}
-            </Button>
+          <Tooltip>
+            <span
+              className="text-lg text-danger cursor-pointer active:opacity-50"
+              onClick={() => handleDownload(certificate._id)}
+            > {isDownloading === certificate.certificateId ? (
+              <Loader2 className="h-6 w-6 animate-spin" />
+            ) : (
+              <FileDown className="h-6 w-6" />
+            )}
+            </span>
           </Tooltip>
         </div>
       );
     }
-  
-    return cellValue;
-  }, [isDownloading]);
+    return certificate[columnKey as keyof Certificate];
+  }, []);
 
   return (
     <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15 max-h-screen-xl max-w-screen-xl">

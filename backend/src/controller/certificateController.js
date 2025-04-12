@@ -123,27 +123,19 @@ const downloadCertificate = async (req, res) => {
         console.log("Received request params:", req.params);
         const { certificateId } = req.params;
 
-        // Find certificate by certificateId field
         const certificate = await Certificate.findOne({ certificateId: certificateId });
         if (!certificate) {
             console.error(`Certificate not found in database: ${certificateId}`);
-            return res.status(404).json({ error: "Certificate not found" });
+            return res.status(404).json({ error: "Certificate not found in database" });
         }
 
-        // Check if the PDF exists
-        const pdfDirectory = path.join(process.cwd(), "certificates");
-        const pdfPath = path.join(pdfDirectory, `${certificateId}.pdf`);
-        
+        const pdfPath = path.join(process.cwd(), "certificates", `${certificateId}.pdf`);
         console.log("Looking for PDF at path:", pdfPath);
 
-        // Ensure directory exists
-        if (!fs.existsSync(pdfDirectory)) {
-            fs.mkdirSync(pdfDirectory, { recursive: true });
-        }
-
-        // Regenerate PDF if it doesn't exist
         if (!fs.existsSync(pdfPath)) {
-            console.log("PDF not found, regenerating...");
+            console.error(`Certificate file not found at path: ${pdfPath}`);
+            
+            console.log("Attempting to regenerate PDF...");
             try {
                 await generatePDF(
                     certificate.certificateNo,
@@ -161,55 +153,36 @@ const downloadCertificate = async (req, res) => {
                     certificate.engineerName,
                     certificate.status
                 );
+                console.log("PDF regenerated successfully");
             } catch (regenerateError) {
                 console.error("Failed to regenerate PDF:", regenerateError);
-                return res.status(500).json({ 
-                    error: "Failed to generate certificate PDF",
-                    details: regenerateError.message 
-                });
+                return res.status(500).json({ error: "Failed to regenerate certificate PDF" });
+            }
+
+            if (!fs.existsSync(pdfPath)) {
+                return res.status(404).json({ error: "Certificate file could not be generated" });
             }
         }
 
-        // Verify PDF exists after regeneration
-        if (!fs.existsSync(pdfPath)) {
-            return res.status(500).json({ error: "Certificate file could not be generated" });
-        }
-
-        // Verify PDF is not empty
-        const stats = fs.statSync(pdfPath);
-        if (stats.size === 0) {
-            console.error("Generated PDF is empty");
-            return res.status(500).json({ error: "Generated certificate PDF is empty" });
-        }
-
-        // Set proper headers
+        console.log("Setting response headers...");
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=certificate-${certificate.certificateNo}.pdf`);
-        res.setHeader('Content-Length', stats.size);
+        res.setHeader('Content-Disposition', `inline; filename=certificate-${certificate.certificateNo}.pdf`);
 
-        // Stream the file
-        const fileStream = fs.createReadStream(pdfPath);
-        
-        fileStream.on('error', (error) => {
-            console.error("Error streaming file:", error);
-            if (!res.headersSent) {
-                res.status(500).json({ 
-                    error: "Error streaming certificate file",
-                    details: error.message 
-                });
-            }
+        console.log("Creating read stream...");
+        const stream = fs.createReadStream(pdfPath);
+        stream.on('error', function (error) {
+            console.error("Error streaming certificate:", error);
+            res.status(500).json({ error: "Failed to download certificate: " + error.message });
         });
 
-        fileStream.pipe(res);
-        
+        console.log("Piping stream to response...");
+        stream.pipe(res);
     } catch (error) {
         console.error("Certificate download error:", error);
-        res.status(500).json({ 
-            error: "Failed to download certificate",
-            details: error.message 
-        });
+        res.status(500).json({ error: "Failed to download certificate: " + error.message });
     }
 };
+
 
 const updateCertificate = async (req, res) => {
     try {

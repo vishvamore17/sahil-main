@@ -1,8 +1,7 @@
 'use client';
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from 'next/navigation';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Loader2, SearchIcon, Edit2Icon, DeleteIcon, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -36,13 +35,13 @@ const generateUniqueId = () => {
 
 // Define columns for the table
 const columns = [
-    { name: "FIRST NAME", uid: "firstName", sortable: true, width: "120px" },
-    { name: "MIDDLE NAME", uid: "middleName", sortable: true, width: "120px" },
-    { name: "LAST NAME", uid: "lastName", sortable: true, width: "120px" },
-    { name: "CONTACT NO", uid: "contactNo", sortable: true, width: "120px" },
-    { name: "EMAIL", uid: "email", sortable: true, width: "120px" },
-    { name: "DESIGNATION", uid: "designation", sortable: true, width: "120px" },
-    { name: "ACTION", uid: "actions", sortable: false, width: "100px" },
+    { name: "First Name", uid: "firstName", sortable: true, width: "120px" },
+    { name: "Middle Name", uid: "middleName", sortable: true, width: "120px" },
+    { name: "Last Name", uid: "lastName", sortable: true, width: "120px" },
+    { name: "Contact No", uid: "contactNo", sortable: true, width: "120px" },
+    { name: "Email", uid: "email", sortable: true, width: "120px" },
+    { name: "Designation", uid: "designation", sortable: true, width: "120px" },
+    { name: "Action", uid: "actions", sortable: false, width: "100px" },
 ];
 
 // Define initial visible columns
@@ -110,11 +109,16 @@ export default function ContactPersonDetailsTable() {
             );
 
             setContactPersons(prev => prev.filter(contact => contact._id !== contactPersonId));
-            toast.success("Contact person deleted successfully");
-        } catch (error) {
+            toast({
+                title: "Delete Successful!",
+                description: "Contact person deleted successfully!",
+            });        } catch (error) {
             console.error("Error deleting contact person:", error);
-            toast.error("Failed to delete contact person");
-        }
+            toast({
+                title: "Error",
+                description: "Failed to delete contact person.",
+                variant: "destructive",
+            });        }
     };
 
 
@@ -172,52 +176,56 @@ export default function ContactPersonDetailsTable() {
 
     const topContent = React.useMemo(() => {
         return (
-            <div className="flex flex-col gap-4">
-                <div className="flex justify-between gap-3 items-end">
-                    <Input
-                        isClearable
-                        className="w-full sm:max-w-[80%]"
-                        placeholder="Search by name..."
-                        startContent={<SearchIcon className="h-4 w-10 text-muted-foreground" />}
-                        value={filterValue}
-                        onChange={(e) => setFilterValue(e.target.value)}
-                        onClear={() => setFilterValue("")}
-                    />
-                </div>
-                <div className="flex justify-between items-center">
-                    <span className="text-default-400 text-small">Total {contactPersons.length} contacts</span>
-                    <label className="flex items-center text-default-400 text-small">
-                        Rows per page:
-                        <select
-                            className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small"
-                            onChange={onRowsPerPageChange}
-                            defaultValue="15"
-                        >
-                            <option value="5">5</option>
-                            <option value="10">10</option>
-                            <option value="15">15</option>
-                        </select>
-                    </label>
-                </div>
+            <div className="flex justify-between items-center gap-4">
+                <Input
+                    isClearable
+                    className="w-full max-w-[300px]"
+                    placeholder="Search"
+                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    onClear={() => setFilterValue("")}
+                />
+                <label className="flex items-center text-default-400 text-small">
+                    Rows per page:
+                    <select
+                        className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
+                        onChange={onRowsPerPageChange}
+                        defaultValue="15"
+                    >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                    </select>
+                </label>
             </div>
         );
     }, [filterValue, onRowsPerPageChange, contactPersons.length]);
 
     const bottomContent = React.useMemo(() => {
         return (
-            <div className="py-2 px-2 flex justify-between items-center">
-                <Pagination
-                    isCompact
-                    showShadow
-                    color="success"
-                    page={page}
-                    total={pages}
-                    onChange={setPage}
-                    classNames={{
-                        cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
-                        item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
-                    }}
-                />
+            <div className="py-2 px-2 relative flex justify-between items-center">
+                <span className="text-default-400 text-small">
+                    Total {contactPersons.length} contacts
+                </span>
+    
+                {/* Centered Pagination */}
+                <div className="absolute left-1/2 transform -translate-x-1/2">
+                    <Pagination
+                        isCompact
+                        showShadow
+                        color="success"
+                        page={page}
+                        total={pages}
+                        onChange={setPage}
+                        classNames={{
+                            cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
+                            item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
+                        }}
+                    />
+                </div>
+    
+                {/* Navigation Buttons */}
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
@@ -241,6 +249,7 @@ export default function ContactPersonDetailsTable() {
             </div>
         );
     }, [page, pages, onPreviousPage, onNextPage]);
+    
 
     const renderCell = useCallback((contact: ContactPerson, columnKey: string) => {
         if (columnKey === "actions") {
@@ -260,7 +269,7 @@ export default function ContactPersonDetailsTable() {
                             className="text-lg text-info cursor-pointer active:opacity-50"
                             onClick={(e) => {
                                 e.preventDefault();
-                                router.push(`admincustomer?id=${contact._id}`);
+                                router.push(`contactform?id=${contact._id}`);
                             }}
                         >
                             <Edit2Icon className="h-6 w-6" />
@@ -313,16 +322,12 @@ export default function ContactPersonDetailsTable() {
                                         <TableColumn key={column.uid}>{column.name}</TableColumn>
                                     ))}
                                 </TableHeader>
-                                <TableBody>
-                                    {paginatedItems.map((contact) => (
-                                        <TableRow key={contact.key}>
-                                            {columns.map((column) => (
-                                                <TableCell key={column.uid}>
-                                                    {renderCell(contact, column.uid)}
-                                                </TableCell>
-                                            ))}
+                                <TableBody emptyContent={"No companies found"} items={paginatedItems}>
+                                    {(item) => (
+                                        <TableRow key={item._id}>
+                                            {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item, columnKey as string)}</TableCell>}
                                         </TableRow>
-                                    ))}
+                                    )}
                                 </TableBody>
                             </Table>
                             {bottomContent}

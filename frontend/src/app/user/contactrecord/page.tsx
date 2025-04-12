@@ -1,12 +1,12 @@
 'use client';
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from 'next/navigation';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Loader2, SearchIcon } from "lucide-react";
+import { Loader2, SearchIcon, Edit2Icon, DeleteIcon, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -35,12 +35,12 @@ const generateUniqueId = () => {
 
 // Define columns for the table
 const columns = [
-    { name: "FIRST NAME", uid: "firstName", sortable: true, width: "120px" },
-    { name: "MIDDLE NAME", uid: "middleName", sortable: true, width: "120px" },
-    { name: "LAST NAME", uid: "lastName", sortable: true, width: "120px" },
-    { name: "CONTACT NO", uid: "contactNo", sortable: true, width: "120px" },
-    { name: "EMAIL", uid: "email", sortable: true, width: "120px" },
-    { name: "DESIGNATION", uid: "designation", sortable: true, width: "120px" },
+    { name: "First Name", uid: "firstName", sortable: true, width: "120px" },
+    { name: "Middle Name", uid: "middleName", sortable: true, width: "120px" },
+    { name: "Last Name", uid: "lastName", sortable: true, width: "120px" },
+    { name: "Contact No", uid: "contactNo", sortable: true, width: "120px" },
+    { name: "Email", uid: "email", sortable: true, width: "120px" },
+    { name: "Designation", uid: "designation", sortable: true, width: "120px" },
 ];
 
 // Define initial visible columns
@@ -88,6 +88,40 @@ export default function ContactPersonDetailsTable() {
             setContactPersons([]);
         }
     };
+
+
+    // Delete contact person by ID
+    const handleDelete = async (contactPersonId: string) => {
+        if (!window.confirm("Are you sure you want to delete this contact person?")) {
+            return;
+        }
+
+        try {
+            await axios.delete(
+                `http://localhost:5000/api/v1/contactperson/deleteContactPerson/${contactPersonId}`,
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+                    },
+                }
+            );
+
+            setContactPersons(prev => prev.filter(contact => contact._id !== contactPersonId));
+            toast({
+                title: "Delete Successful!",
+                description: "Contact person deleted successfully!",
+            });
+        } catch (error) {
+            console.error("Error deleting contact person:", error);
+            toast({
+                title: "Error",
+                description: "Failed to delete contact person.",
+                variant: "destructive",
+            });
+        }
+    };
+
 
     const filteredItems = React.useMemo<ContactPerson[]>(() => {
         let filtered = [...contactPersons];
@@ -143,52 +177,56 @@ export default function ContactPersonDetailsTable() {
 
     const topContent = React.useMemo(() => {
         return (
-            <div className="flex flex-col gap-4">
-                <div className="flex justify-between gap-3 items-end">
-                    <Input
-                        isClearable
-                        className="w-full sm:max-w-[80%]"
-                        placeholder="Search by name..."
-                        startContent={<SearchIcon className="h-4 w-10 text-muted-foreground" />}
-                        value={filterValue}
-                        onChange={(e) => setFilterValue(e.target.value)}
-                        onClear={() => setFilterValue("")}
-                    />
-                </div>
-                <div className="flex justify-between items-center">
-                    <span className="text-default-400 text-small">Total {contactPersons.length} contacts</span>
-                    <label className="flex items-center text-default-400 text-small">
-                        Rows per page:
-                        <select
-                            className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small"
-                            onChange={onRowsPerPageChange}
-                            defaultValue="15"
-                        >
-                            <option value="5">5</option>
-                            <option value="10">10</option>
-                            <option value="15">15</option>
-                        </select>
-                    </label>
-                </div>
+            <div className="flex justify-between items-center gap-4">
+                <Input
+                    isClearable
+                    className="w-full max-w-[300px]"
+                    placeholder="Search"
+                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    onClear={() => setFilterValue("")}
+                />
+                <label className="flex items-center text-default-400 text-small">
+                    Rows per page:
+                    <select
+                        className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
+                        onChange={onRowsPerPageChange}
+                        defaultValue="15"
+                    >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                    </select>
+                </label>
             </div>
         );
     }, [filterValue, onRowsPerPageChange, contactPersons.length]);
 
     const bottomContent = React.useMemo(() => {
         return (
-            <div className="py-2 px-2 flex justify-between items-center">
-                <Pagination
-                    isCompact
-                    showShadow
-                    color="success"
-                    page={page}
-                    total={pages}
-                    onChange={setPage}
-                    classNames={{
-                        cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
-                        item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
-                    }}
-                />
+            <div className="py-2 px-2 relative flex justify-between items-center">
+                <span className="text-default-400 text-small">
+                    Total {contactPersons.length} contacts
+                </span>
+
+                {/* Centered Pagination */}
+                <div className="absolute left-1/2 transform -translate-x-1/2">
+                    <Pagination
+                        isCompact
+                        showShadow
+                        color="success"
+                        page={page}
+                        total={pages}
+                        onChange={setPage}
+                        classNames={{
+                            cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
+                            item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
+                        }}
+                    />
+                </div>
+
+                {/* Navigation Buttons */}
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
@@ -213,11 +251,15 @@ export default function ContactPersonDetailsTable() {
         );
     }, [page, pages, onPreviousPage, onNextPage]);
 
+
+
+
     useEffect(() => {
         fetchContactPersons();
     }, []);
 
     return (
+
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
@@ -228,12 +270,12 @@ export default function ContactPersonDetailsTable() {
                         <Separator orientation="vertical" className="mr-2 h-4" />
                         <Breadcrumb>
                             <BreadcrumbList>
-                                <BreadcrumbLink href="/user/dashboard">
+                                <BreadcrumbLink href="/admin/dashboard">
                                     Dashboard
                                 </BreadcrumbLink>
                                 <BreadcrumbSeparator className="hidden md:block" />
                                 <BreadcrumbItem>
-                                    <BreadcrumbLink href="/user/contactform">
+                                    <BreadcrumbLink href="/admin/contactform">
                                         Create Contact
                                     </BreadcrumbLink>
                                 </BreadcrumbItem>
@@ -254,16 +296,12 @@ export default function ContactPersonDetailsTable() {
                                         <TableColumn key={column.uid}>{column.name}</TableColumn>
                                     ))}
                                 </TableHeader>
-                                <TableBody>
-                                    {paginatedItems.map((contact) => (
-                                        <TableRow key={contact.key}>
-                                            {columns.map((column) => (
-                                                <TableCell key={column.uid}>
-                                                    {(column.uid)}
-                                                </TableCell>
-                                            ))}
+                                <TableBody emptyContent={"No companies found"} items={paginatedItems}>
+                                    {(item) => (
+                                        <TableRow key={item._id}>
+                                            {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{( columnKey as string)}</TableCell>}
                                         </TableRow>
-                                    ))}
+                                    )}
                                 </TableBody>
                             </Table>
                             {bottomContent}
@@ -274,3 +312,5 @@ export default function ContactPersonDetailsTable() {
         </SidebarProvider>
     );
 }
+
+

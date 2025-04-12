@@ -7,8 +7,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
-
-
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,11 +62,17 @@ export function RegisterPage() {
           setError(data.error || "An error occurred. Please try again.");
         }
       } else {
-        alert("Registration successful!");
-
+        toast({
+          title: "Registration successful!",
+          description: "You have registered successfully!",
+        })
       }
     } catch (error) {
-      setError("An error occurred during registration. Please try again.");
+      toast({
+        title: "Error",
+        description: "An error occurred during registration. Please try again.",
+        variant: "destructive",
+      })    
     } finally {
       setLoading(false); // Reset loading state
     }
@@ -179,9 +184,6 @@ export function RegisterPage() {
                   </div>
 
                 </div>
-
-                {/* Display error message */}
-                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               </div>
             </CardContent>
             <CardFooter>

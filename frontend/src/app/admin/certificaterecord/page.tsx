@@ -1,8 +1,7 @@
 'use client';
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState,  useCallback } from "react"
 import { useRouter } from 'next/navigation';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Loader2, SearchIcon, Edit2Icon, FileDown, DeleteIcon } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -60,15 +59,15 @@ const formatDate = (dateString: string): string => {
 };
 
 const columns = [
-    { name: "CERTIFICATE NO", uid: "certificateNo", sortable: true, width: "120px" },
-    { name: "CUSTOMER", uid: "customerName", sortable: true, width: "120px" },
-    { name: "SITE LOCATION", uid: "siteLocation", sortable: true, width: "120px" },
-    { name: "MAKE MODEL", uid: "makeModel", sortable: true, width: "120px" },
-    { name: "SERIAL NO", uid: "serialNo", sortable: true, width: "120px" },
+    { name: "Certificate No", uid: "certificateNo", sortable: true, width: "120px" },
+    { name: "Customer", uid: "customerName", sortable: true, width: "120px" },
+    { name: "Site Location", uid: "siteLocation", sortable: true, width: "120px" },
+    { name: "Make Model", uid: "makeModel", sortable: true, width: "120px" },
+    { name: "Serial No", uid: "serialNo", sortable: true, width: "120px" },
 
-    { name: "ENGINEER NAME", uid: "engineerName", sortable: true, width: "120px" },
+    { name: "Engineer Name", uid: "engineerName", sortable: true, width: "120px" },
 
-    { name: "ACTION", uid: "actions", sortable: true, width: "100px" },
+    { name: "Action", uid: "actions", sortable: true, width: "100px" },
 ];
 const INITIAL_VISIBLE_COLUMNS = ["certificateNo", "customerName", "siteLocation", "makeModel", "range", "serialNo", "calibrationGas", "gasCanisterDetails", "dateOfCalibration", "calibrationDueDate", "engineerName", "actions"];
 
@@ -167,12 +166,17 @@ export default function CertificateTable() {
             // Remove the deleted certificate from the state
             setCertificates((prevCertificates) => prevCertificates.filter(cert => cert._id !== certificateId));
 
-            // Show success message
-            toast.success("Certificate deleted successfully.");
+            toast({
+                title: "Delete Successful!",
+                description: "Certificate deleted successfully!",
+            });
         } catch (error) {
             console.error("Error deleting certificate:", error);
-            toast.error("Failed to delete certificate.");
-        }
+            toast({
+                title: "Error",
+                description: "Failed to delete certificate.",
+                variant: "destructive",
+            });           }
     };
 
     const [filterValue, setFilterValue] = useState("");
@@ -257,8 +261,8 @@ export default function CertificateTable() {
             window.URL.revokeObjectURL(url);
 
             toast({
-                title: "Success",
-                description: "Certificate downloaded successfully",
+                title: "Download Successful!",
+                description: "Certificate downloaded successfully!",
                 variant: "default",
             });
         } catch (err) {
@@ -280,7 +284,6 @@ export default function CertificateTable() {
                     errorMessage = "No internet connection. Please check your network.";
                 }
             }
-
             toast({
                 title: "Error",
                 description: errorMessage,
@@ -325,67 +328,56 @@ export default function CertificateTable() {
 
     const topContent = React.useMemo(() => {
         return (
-            <div className="flex flex-col gap-4">
-                <div className="flex justify-between gap-3 items-end">
-                    <Input
-                        isClearable
-                        className="w-full sm:max-w-[80%]"
-                        placeholder="Search by name..."
-                        startContent={<SearchIcon className="h-4 w-10 text-muted-foreground" />}
-                        value={filterValue}
-                        onChange={(e) => setFilterValue(e.target.value)}
-                        onClear={() => setFilterValue("")}
-                    />
-
-
-                </div>
-                <div className="flex justify-between items-center">
-                    <span className="text-default-400 text-small">Total {certificates.length} certificates</span>
-                    <label className="flex items-center text-default-400 text-small">
-                        Rows per page:
-                        <select
-                            className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small"
-                            onChange={onRowsPerPageChange}
-                            defaultValue="15"
-                        >
-                            <option value="5">5</option>
-                            <option value="10">10</option>
-                            <option value="15">15</option>
-                        </select>
-                    </label>
-                </div>
+            <div className="flex justify-between items-center gap-4">
+                <Input
+                    isClearable
+                    className="w-full max-w-[300px]"
+                    placeholder="Search by name or GST"
+                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    onClear={() => setFilterValue("")}
+                />
+                <label className="flex items-center text-default-400 text-small">
+                    Rows per page:
+                    <select
+                        className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
+                        onChange={onRowsPerPageChange}
+                        defaultValue="15"
+                    >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                    </select>
+                </label>
             </div>
         );
-    }, [
-        filterValue,
-        statusFilter,
-        visibleColumns,
-        onRowsPerPageChange,
-        certificates.length,
-        onSearchChange,
-    ]);
-
+    }, [filterValue, onRowsPerPageChange, certificates.length, onSearchChange,visibleColumns]);
+    
     const bottomContent = React.useMemo(() => {
         return (
-            <div className="py-2 px-2 flex justify-between items-center">
-                <span className="w-[30%] text-small text-default-400">
-
+            <div className="py-2 px-2 relative flex justify-between items-center">
+                <span className="text-default-400 text-small">
+                    Total {certificates.length} certificates
                 </span>
-                <Pagination
-                    isCompact
-                    // showControlsf
-                    showShadow
-                    color="success"
-                    page={page}
-                    total={pages}
-                    onChange={setPage}
-                    classNames={{
-                        // base: "gap-2 rounded-2xl shadow-lg p-2 dark:bg-default-100",
-                        cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
-                        item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
-                    }}
-                />
-
+    
+                {/* Centered Pagination */}
+                <div className="absolute left-1/2 transform -translate-x-1/2">
+                    <Pagination
+                        isCompact
+                        showShadow
+                        color="success"
+                        page={page}
+                        total={pages}
+                        onChange={setPage}
+                        classNames={{
+                            cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
+                            item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
+                        }}
+                    />
+                </div>
+    
+                {/* Navigation Buttons */}
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
@@ -396,7 +388,6 @@ export default function CertificateTable() {
                     >
                         Previous
                     </Button>
-
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
                         variant="default"
@@ -406,13 +397,11 @@ export default function CertificateTable() {
                     >
                         Next
                     </Button>
-
-
                 </div>
             </div>
         );
-    }, [selectedKeys, items.length, page, pages, hasSearchFilter]);
-
+    }, [selectedKeys, page, pages, onPreviousPage, onNextPage, items.length ,hasSearchFilter]);
+    
     const handleSelectionChange = (keys: Selection) => {
         if (keys === "all") {
             setSelectedKeys(new Set(certificates.map(cert => cert._id)));
@@ -425,19 +414,13 @@ export default function CertificateTable() {
         setVisibleColumns(keys);
     };
 
-    const renderCell = React.useCallback((certificate: Certificate, columnKey: string): React.ReactNode => {
-        const cellValue = certificate[columnKey];
-
-        if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate") && cellValue) {
-            return formatDate(cellValue);
-        }
-
+    const renderCell = useCallback((certificate: Certificate, columnKey: string) => {
         if (columnKey === "actions") {
             return (
                 <div className="relative flex items-center gap-2">
                     <Tooltip>
                         <span
-                            className="text-lg text-danger cursor-pointer active:opacity-50"
+                            className="text-lg text-info cursor-pointer active:opacity-50"
                             onClick={(e) => {
                                 e.preventDefault();
                                 handleDownload(certificate._id);
@@ -450,42 +433,33 @@ export default function CertificateTable() {
                             )}
                         </span>
                     </Tooltip>
-
                     <Tooltip>
                         <span
                             className="text-lg text-info cursor-pointer active:opacity-50"
                             onClick={(e) => {
                                 e.preventDefault();
-                                router.push(`addcategory?id=${certificate._id}`);
+                                router.push(`adminservice?id=${certificate._id}`);
                             }}
                         >
                             <Edit2Icon className="h-6 w-6" />
                         </span>
                     </Tooltip>
-
-                    {/* Delete Certificate Icon */}
+    
                     <Tooltip>
                         <span
                             className="text-lg text-danger cursor-pointer active:opacity-50"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleDelete(certificate._id); // Use _id for deletion
-                            }}
+                            onClick={() => handleDelete(certificate._id)}
                         >
-                            {isDownloading === certificate._id ? (
-                                <Loader2 className="h-6 w-6 animate-spin" />
-                            ) : (
-                                <DeleteIcon className="h-6 w-6" />
-                            )}
+                            <DeleteIcon className="h-6 w-6" />
                         </span>
                     </Tooltip>
                 </div>
             );
         }
-
-        return cellValue;
-    }, [isDownloading, handleDownload, handleDelete]);
-
+        return certificate[columnKey as keyof Certificate];
+    }, []);
+    
+    
     return (
         <SidebarProvider>
             <AdminSidebar />
@@ -514,12 +488,11 @@ export default function CertificateTable() {
                     </div>
                 </header>
                 <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
-                    <Card className="max-w-7xl mx-auto">
+                    <Card className="max-w-6xl mx-auto">
                         <CardHeader>
                             <CardTitle className="text-3xl font-bold text-center">Certificate Record</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15 max-h-screen-xl max-w-screen-xl">
                                 <Table
                                     isHeaderSticky
                                     aria-label="Leads table with custom cells, pagination and sorting"
@@ -559,8 +532,6 @@ export default function CertificateTable() {
                                         )}
                                     </TableBody>
                                 </Table>
-
-                            </div>
                         </CardContent>
                     </Card>
                 </div>

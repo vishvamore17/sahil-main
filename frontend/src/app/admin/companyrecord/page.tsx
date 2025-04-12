@@ -1,21 +1,16 @@
 'use client';
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from 'next/navigation';
-import { toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Loader2, SearchIcon, Edit2Icon, DeleteIcon, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-    SidebarInset,
-    SidebarProvider,
-    SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 import { ModeToggle } from "@/components/ModeToggle";
 import { Pagination, Tooltip } from "@heroui/react";
@@ -30,6 +25,7 @@ interface CompanyDetails {
     website: string;
     industriesType: string;
     flag: string;
+    key?: string;
 }
 
 const generateUniqueId = () => {
@@ -37,14 +33,14 @@ const generateUniqueId = () => {
 };
 
 const columns = [
-    { name: "COMPANY NAME", uid: "companyName", sortable: true, width: "120px" },
-    { name: "ADDRESS", uid: "address", sortable: true, width: "120px" },
-    { name: "GST NUMBER", uid: "gstNumber", sortable: true, width: "120px" },
-    { name: "INDUSTRIES", uid: "industries", sortable: true, width: "120px" },
-    { name: "WEBSITE", uid: "website", sortable: true, width: "120px" },
-    { name: "INDUSTRIES TYPE", uid: "industriesType", sortable: true, width: "120px" },
-    { name: "FLAG", uid: "flag", sortable: true, width: "120px" },
-    { name: "ACTION", uid: "actions", sortable: false, width: "100px" },
+    { name: "Company Name", uid: "companyName", sortable: true, width: "120px" },
+    { name: "Address", uid: "address", sortable: true, width: "120px" },
+    { name: "GST Number", uid: "gstNumber", sortable: true, width: "120px" },
+    { name: "Industries", uid: "industries", sortable: true, width: "120px" },
+    { name: "Website", uid: "website", sortable: true, width: "120px" },
+    { name: "Industries Tyre", uid: "industriesType", sortable: true, width: "120px" },
+    { name: "Flag", uid: "flag", sortable: true, width: "120px" },
+    { name: "Action", uid: "actions", sortable: false, width: "100px" },
 ];
 
 const INITIAL_VISIBLE_COLUMNS = ["companyName", "address", "gstNumber", "industries", "website", "industriesType", "flag", "actions"];
@@ -57,9 +53,7 @@ export default function CompanyDetailsTable() {
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [page, setPage] = useState(1);
     const [filterValue, setFilterValue] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDownloading, setIsDownloading] = useState<string | null>(null);
-    
     const [sortDescriptor, setSortDescriptor] = useState({
         column: "companyName",
         direction: "ascending" as "ascending" | "descending",
@@ -81,7 +75,7 @@ export default function CompanyDetailsTable() {
             );
     
             let companiesData = Array.isArray(response.data) ? response.data : 
-                                response.data?.data ? response.data.data : [];
+                              response.data?.data ? response.data.data : [];
             
             const companiesWithKeys = companiesData.map((company: CompanyDetails) => ({
                 ...company,
@@ -118,16 +112,17 @@ export default function CompanyDetailsTable() {
             );
 
             setCompanies(prev => prev.filter(company => company._id !== companyId));
-            toast.success("Company deleted successfully");
-        } catch (error) {
+            toast({
+                title: "Delete Successful!",
+                description: "Company deleted successfully!",
+            });        } catch (error) {
             console.error("Error deleting company:", error);
-            toast.error("Failed to delete company");
-        }
+            toast({
+                title: "Error",
+                description: "Failed to delete company.",
+                variant: "destructive",
+            });             }
     };
-
-    const headerColumns = React.useMemo(() => {
-        return columns.filter(column => visibleColumns.has(column.uid));
-    }, [visibleColumns]);
 
     const filteredItems = React.useMemo(() => {
         let filtered = [...companies];
@@ -178,53 +173,56 @@ export default function CompanyDetailsTable() {
 
     const topContent = React.useMemo(() => {
         return (
-            <div className="flex flex-col gap-4">
-                <div className="flex justify-between gap-3 items-end">
-                    <Input
-                        isClearable
-                        className="w-full sm:max-w-[80%]"
-                        placeholder="Search by name..."
-                        startContent={<SearchIcon className="h-4 w-10 text-muted-foreground" />}
-                        value={filterValue}
-                        onChange={(e) => setFilterValue(e.target.value)}
-                        onClear={() => setFilterValue("")}
-                    />
-                </div>
-                <div className="flex justify-between items-center">
-                    <span className="text-default-400 text-small">Total {companies.length} companies</span>
-                    <label className="flex items-center text-default-400 text-small">
-                        Rows per page:
-                        <select
-                            className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small"
-                            onChange={onRowsPerPageChange}
-                            defaultValue="15"
-                        >
-                            <option value="5">5</option>
-                            <option value="10">10</option>
-                            <option value="15">15</option>
-                        </select>
-                    </label>
-                </div>
+            <div className="flex justify-between items-center gap-4">
+                <Input
+                    isClearable
+                    className="w-full max-w-[300px]"
+                    placeholder="Search by name or GST"
+                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    onClear={() => setFilterValue("")}
+                />
+                <label className="flex items-center text-default-400 text-small">
+                    Rows per page:
+                    <select
+                        className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
+                        onChange={onRowsPerPageChange}
+                        defaultValue="15"
+                    >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                    </select>
+                </label>
             </div>
         );
     }, [filterValue, onRowsPerPageChange, companies.length]);
 
     const bottomContent = React.useMemo(() => {
         return (
-            <div className="py-2 px-2 flex justify-between items-center">
-                <span className="w-[30%] text-small text-default-400"></span>
-                <Pagination
-                    isCompact
-                    showShadow
-                    color="success"
-                    page={page}
-                    total={pages}
-                    onChange={setPage}
-                    classNames={{
-                        cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
-                        item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
-                    }}
-                />
+            <div className="py-2 px-2 relative flex justify-between items-center">
+                <span className="text-default-400 text-small">
+                    Total {companies.length} companies
+                </span>
+    
+                {/* Centered Pagination */}
+                <div className="absolute left-1/2 transform -translate-x-1/2">
+                    <Pagination
+                        isCompact
+                        showShadow
+                        color="success"
+                        page={page}
+                        total={pages}
+                        onChange={setPage}
+                        classNames={{
+                            cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
+                            item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
+                        }}
+                    />
+                </div>
+    
+                {/* Navigation Buttons */}
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
                         className="bg-[hsl(339.92deg_91.04%_52.35%)]"
@@ -247,19 +245,18 @@ export default function CompanyDetailsTable() {
                 </div>
             </div>
         );
-    }, [page, pages, onPreviousPage, onNextPage]);
+    }, [page, pages, onPreviousPage, onNextPage, companies.length]);
 
     const renderCell = useCallback((company: CompanyDetails, columnKey: string) => {
         if (columnKey === "actions") {
             return (
                 <div className="relative flex items-center gap-2">
-                    
                     <Tooltip>
                         <span
                             className="text-lg text-info cursor-pointer active:opacity-50"
                             onClick={(e) => {
                                 e.preventDefault();
-                                router.push(`adminCompany?id=${company._id}`); 
+                                router.push(`companyform?id=${company._id}`); 
                             }}
                         >
                             <Edit2Icon className="h-6 w-6" />
@@ -281,7 +278,7 @@ export default function CompanyDetailsTable() {
             );
         }
         return company[columnKey as keyof CompanyDetails];
-    }, [isDownloading, router]);
+    }, [router]);
 
     return (
         <SidebarProvider>
@@ -315,51 +312,26 @@ export default function CompanyDetailsTable() {
                             <CardTitle className="text-3xl font-bold text-center">Company Record</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15 max-h-screen-xl max-w-screen-xl">
-                                <Table
-                                    isHeaderSticky
-                                    aria-label="Companies table with custom cells, pagination and sorting"
-                                    bottomContent={bottomContent}
-                                    bottomContentPlacement="outside"
-                                    classNames={{
-                                        wrapper: "max-h-[382px] overflow-y-auto",
-                                    }}
-                                    selectedKeys={selectedKeys}
-                                    sortDescriptor={sortDescriptor}
-                                    topContent={topContent}
-                                    topContentPlacement="outside"
-                                    onSelectionChange={(keys) => setSelectedKeys(keys as Set<string>)}
-                                    onSortChange={(descriptor) => {
-                                        setSortDescriptor({
-                                            column: descriptor.column as string,
-                                            direction: descriptor.direction as "ascending" | "descending",
-                                        });
-                                    }}
-                                >
-                                    <TableHeader columns={headerColumns}>
-                                        {(column) => (
-                                            <TableColumn
-                                                key={column.uid}
-                                                align={column.uid === "actions" ? "center" : "start"}
-                                                allowsSorting={column.sortable}
-                                            >
-                                                {column.name}
-                                            </TableColumn>
-                                        )}
-                                    </TableHeader>
-                                    <TableBody emptyContent={"No companies found"} items={paginatedItems}>
-                                        {(item) => (
-                                            <TableRow key={item._id}>
-                                                {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item, columnKey as string)}</TableCell>}
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                            {topContent}
+                            <Table>
+                                <TableHeader>
+                                    {columns.map((column) => (
+                                        <TableColumn key={column.uid}>{column.name}</TableColumn>
+                                    ))}
+                                </TableHeader>
+                                <TableBody emptyContent={"No companies found"} items={paginatedItems}>
+                                    {(item) => (
+                                        <TableRow key={item._id}>
+                                            {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item, columnKey as string)}</TableCell>}
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                            {bottomContent}
                         </CardContent>
                     </Card>
                 </div>
             </SidebarInset>
         </SidebarProvider>
-    );  
+    );
 }
