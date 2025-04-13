@@ -86,14 +86,14 @@ export default function Customer() {
       if (contactId) {
         await axios.put(`http://localhost:5000/api/v1/contactperson/updateContactPerson/${contactId}`, values);
         toast({
-          title: "Success",
-          description: "Contact updated successfully!",
+          title: "Update Successfull!",
+          description: "Contact has been updated successfully!",
         });
       } else {
         await axios.post("http://localhost:5000/api/v1/contactperson/generateContactPerson", values);
         toast({
-          title: "Success",
-          description: "Contact created successfully!",
+          title: "Create Successfull",
+          description: "Contact has been created successfully!",
         });
         form.reset();
       }

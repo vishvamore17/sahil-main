@@ -1,87 +1,117 @@
 "use client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import {
+  Card, CardContent, CardDescription,
+  CardHeader, CardTitle, CardFooter,
+} from "@/components/ui/card";
+
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+
+import {
+  Breadcrumb, BreadcrumbItem, BreadcrumbLink,
+  BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
 import { Eye, EyeOff } from "react-feather";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { ModeToggle } from "@/components/ModeToggle";
+import { Separator } from "@/components/ui/separator";
 
+
+// Zod Schema for validation
+const registerSchema = z.object({
+  name: z.string().min(3, "Name must be at least 3 characters"),
+  email: z.string().email("Invalid email"),
+  contact: z.string().min(10, "Contact must be 10 digits").max(10, "Contact must be 10 digits"),
+  password: z.string()
+    .min(6, "Password must be at least 6 characters")
+    .regex(/^(?=.*[A-Za-z])(?=.*\d)/, "Password must include at least one letter and one number"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+type RegisterSchema = z.infer<typeof registerSchema>;
 
 export function RegisterPage() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [contact, setContact] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm<RegisterSchema>({
+    resolver: zodResolver(registerSchema),
+  });
 
-  const handleRegister = async () => {
-    if (password !== confirmPassword) {
-      setError("Passwords do not match!");
-      return;
-    }
-
-    if (!name || !email || !password) {
-      setError("Please fill in all fields.");
-      return;
-    }
-
-    setLoading(true);
-
+  const onSubmit = async (data: RegisterSchema) => {
     try {
-
       const response = await fetch("http://localhost:5000/api/v1/users/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name, email, password, contact }),
+        body: JSON.stringify({
+          name: data.name,
+          email: data.email,
+          password: data.password,
+          contact: data.contact,
+        }),
       });
 
-      const data = await response.json();
+      const result = await response.json();
 
       if (!response.ok) {
-
-        if (data.message && data.message.includes("reached the limit")) {
-          setError("You have reached the registration limit. Please try again later.");
+        if (result.message?.includes("reached the limit")) {
+          toast({
+            title: "Registration limit reached",
+            description: "Please try again later.",
+            variant: "destructive",
+          });
         } else {
-          setError(data.error || "An error occurred. Please try again.");
+          toast({
+            title: "Registration failed",
+            description: result.error || "An error occurred. Please try again.",
+            variant: "destructive",
+          });
         }
       } else {
         toast({
           title: "Registration successful!",
           description: "You have registered successfully!",
-        })
+        });
+        reset(); // Clear form
       }
-    } catch (error) {
+    } catch (err) {
       toast({
         title: "Error",
-        description: "An error occurred during registration. Please try again.",
+        description: "An error occurred during registration.",
         variant: "destructive",
-      })    
-    } finally {
-      setLoading(false); // Reset loading state
+      });
     }
   };
+
   return (
     <SidebarProvider>
       <AdminSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <header className="flex h-16 items-center gap-2">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <ModeToggle />
@@ -89,9 +119,7 @@ export function RegisterPage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/admin/dashboard">
-                    Dashboard
-                  </BreadcrumbLink>
+                  <BreadcrumbLink href="/admin/dashboard">Dashboard</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
@@ -103,7 +131,8 @@ export function RegisterPage() {
             </Breadcrumb>
           </div>
         </header>
-        <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8 pt-15">
+
+        <div className="container mx-auto py-10 px-4 sm:px-6 lg:px-8">
           <Card className="max-w-2xl mx-auto">
             <CardHeader>
               <CardTitle className="text-3xl font-bold text-center">Create User</CardTitle>
@@ -111,95 +140,94 @@ export function RegisterPage() {
                 Fill out the form below to create a new user
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="grid w-full items-center gap-4">
-                {/* Name Input */}
+
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <CardContent className="grid w-full gap-4">
+                {/* Name */}
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="name">Name</Label>
-                  <Input
-                    placeholder="Enter your name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
+                  <Input {...register("name")} placeholder="Enter your name" />
+                  {errors.name && <p className="text-red-500 text-sm">{errors.name.message}</p>}
                 </div>
 
-                {/* Email Input */}
+                {/* Email */}
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="email">Email</Label>
-                  <Input
-                    type="email"
-                    placeholder="Enter your email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
+                  <Input type="email" {...register("email")} placeholder="Enter your email" />
+                  {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
                 </div>
 
+                {/* Contact */}
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="contact">Contact</Label>
                   <Input
-                    type="number"
-                    placeholder="Enter your contact"
-                    value={contact}
-                    onChange={(e) => setContact(e.target.value)}
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    {...register("contact")}
+                    onInput={(e) => {
+                      e.currentTarget.value = e.currentTarget.value.replace(/\D/g, "");
+                    }}
+                    placeholder="Enter your contact number"
                   />
+
+                  {errors.contact && <p className="text-red-500 text-sm">{errors.contact.message}</p>}
                 </div>
 
-                {/* Password Input */}
+                {/* Password */}
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
                     <Input
                       type={showPassword ? "text" : "password"}
+                      {...register("password")}
                       placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
                     />
                     <button
                       type="button"
                       className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
-                      onClick={() => setShowPassword(!showPassword)}
+                      onClick={() => setShowPassword((prev) => !prev)}
                     >
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
                   </div>
+                  {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
                 </div>
 
-                {/* Confirm Password Input */}
+                {/* Confirm Password */}
                 <div className="flex flex-col space-y-1.5">
                   <Label htmlFor="confirmPassword">Confirm Password</Label>
                   <div className="relative">
                     <Input
                       type={showConfirmPassword ? "text" : "password"}
+                      {...register("confirmPassword")}
                       placeholder="Confirm your password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
                     />
                     <button
                       type="button"
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center justify-center text-gray-500"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                      onClick={() => setShowConfirmPassword((prev) => !prev)}
                     >
                       {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
                   </div>
-
+                  {errors.confirmPassword && (
+                    <p className="text-red-500 text-sm">{errors.confirmPassword.message}</p>
+                  )}
                 </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full" onClick={handleRegister} disabled={loading}>
-                {loading ? "Registering..." : "Create"}
-              </Button>
-            </CardFooter>
+              </CardContent>
 
-
+              <CardFooter>
+                <Button className="w-full" type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Registering..." : "Create"}
+                </Button>
+              </CardFooter>
+            </form>
           </Card>
         </div>
       </SidebarInset>
     </SidebarProvider>
-
-
-  )
-};
+  );
+}
 
 export default RegisterPage;

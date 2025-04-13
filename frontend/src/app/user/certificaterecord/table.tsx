@@ -307,7 +307,9 @@ export default function CertificateTable() {
   const onClear = React.useCallback(() => {
     setFilterValue("");
     setPage(1);
-  }, []); const topContent = React.useMemo(() => {
+  }, []); 
+  
+  const topContent = React.useMemo(() => {
     return (
       <div className="flex justify-between items-center gap-4">
         <Input
@@ -324,7 +326,7 @@ export default function CertificateTable() {
           <select
             className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
             onChange={onRowsPerPageChange}
-            defaultValue="15"
+            defaultValue="5"
           >
             <option value="5">5</option>
             <option value="10">10</option>

@@ -343,7 +343,7 @@ export default function CertificateTable() {
                     <select
                         className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
                         onChange={onRowsPerPageChange}
-                        defaultValue="15"
+                        defaultValue="5"
                     >
                         <option value="5">5</option>
                         <option value="10">10</option>
@@ -438,7 +438,7 @@ export default function CertificateTable() {
                             className="text-lg text-info cursor-pointer active:opacity-50"
                             onClick={(e) => {
                                 e.preventDefault();
-                                router.push(`adminservice?id=${certificate._id}`);
+                                router.push(`/admin/certificateform?id=${certificate._id}`);
                             }}
                         >
                             <Edit2Icon className="h-6 w-6" />

@@ -369,7 +369,7 @@ export default function GenerateService() {
                     status: ""
                 });
             } else {
-                router.push("/admincertificatetable");
+                router.push("/admin/servicerecord");
             }
         } catch (err: any) {
             setIsGeneratingPDF(false);

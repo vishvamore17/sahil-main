@@ -321,7 +321,7 @@ const topContent = React.useMemo(() => {
                 <select
                     className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
                     onChange={onRowsPerPageChange}
-                    defaultValue="15"
+                    defaultValue="5"
                 >
                     <option value="5">5</option>
                     <option value="10">10</option>
@@ -395,6 +395,9 @@ const bottomContent = React.useMemo(() => {
 
 
     const handleDelete = async (serviceId: string) => {
+        if (!window.confirm("Are you sure you want to delete this company data?")) {
+            return;
+        }
         try {
             console.log("Attempting to delete service ID:", serviceId);
 
@@ -483,7 +486,7 @@ const bottomContent = React.useMemo(() => {
                             className="text-lg text-info cursor-pointer active:opacity-50"
                             onClick={(e) => {
                                     e.preventDefault();
-                                    router.push(`adminservice?id=${service._id}`);
+                                    router.push(`serviceform?id=${service._id}`);
                                 }}
                         >
                             <Edit2Icon className="h-6 w-6" />

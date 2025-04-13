@@ -314,7 +314,7 @@ const topContent = React.useMemo(() => {
                 <select
                     className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
                     onChange={onRowsPerPageChange}
-                    defaultValue="15"
+                    defaultValue="5"
                 >
                     <option value="5">5</option>
                     <option value="10">10</option>

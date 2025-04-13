@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from '@/hooks/use-toast'
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { ModeToggle } from "@/components/ModeToggle";
+import { useRouter } from 'next/navigation';
 
 interface Observation {
     gas: string;
@@ -80,7 +81,7 @@ export default function AddCategory() {
     const [engineers, setEngineers] = useState<Engineer[]>([]);
     const [isLoadingEngineers, setIsLoadingEngineers] = useState(true);
     const [engineerError, setEngineerError] = useState<string | null>(null);
-
+    const router = useRouter();
 
     // Fetch models and engineers
     useEffect(() => {
@@ -359,13 +360,13 @@ export default function AddCategory() {
             setCertificate(response.data);
 
             toast({
-                title: "Success",
+                title: " Success!",
                 description: certificateId ? "Certificate updated successfully!" : "Certificate generated successfully!",
                 variant: "default",
             });
 
             if (certificateId) {
-                router.push("/certificates");
+                router.push("/admin/certificaterecord");
             }
         } catch (err: any) {
             console.error("Submission error:", err);
