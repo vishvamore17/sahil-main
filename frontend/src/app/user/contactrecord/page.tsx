@@ -165,14 +165,14 @@ export default function ContactPersonDetailsTable() {
         return (
             <div className="flex justify-between gap-3 items-end">
                 <Input
-                    isClearable
-                    className="w-full sm:max-w-[80%]"
-                    placeholder="Search by name..."
-                    startContent={<SearchIcon className="h-4 w-10 text-muted-foreground" />}
-                    value={filterValue}
-                    onChange={(e) => setFilterValue(e.target.value)}
-                    onClear={() => setFilterValue("")}
-                />
+                                    isClearable
+                                    className="w-full max-w-[300px]"
+                                    placeholder="Search by name or GST"
+                                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                                    value={filterValue}
+                                    onChange={(e) => setFilterValue(e.target.value)}
+                                    onClear={() => setFilterValue("")}
+                                />
                 <label className="flex items-center text-default-400 text-small">
                     Rows per page:
                     <select
