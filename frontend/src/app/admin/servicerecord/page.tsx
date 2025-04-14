@@ -88,8 +88,8 @@ export default function AdminServiceTable() {
     const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
-        column: "nameAndLocation",
-        direction: "ascending",
+        column: "createdAt", // Default sort by creation date
+        direction: "descending", // Newest first by default
     });
     const [page, setPage] = React.useState(1);
     const router = useRouter();
@@ -105,52 +105,35 @@ export default function AdminServiceTable() {
                     headers: {
                         "Content-Type": "application/json",
                         "Authorization": `Bearer ${localStorage.getItem("token")}`
-                    }   
+                    }
                 }
             );
 
-            // Log the response structure
-            console.log('Full API Response:', {
-                status: response.status,
-                data: response.data,
-                type: typeof response.data,
-                hasData: 'data' in response.data
-            });
-
-            // Handle the response based on its structure
             let servicesData;
             if (typeof response.data === 'object' && 'data' in response.data) {
-                // Response format: { data: [...services] }
                 servicesData = response.data.data;
             } else if (Array.isArray(response.data)) {
-                // Response format: [...services]
                 servicesData = response.data;
             } else {
-                console.error('Unexpected response format:', response.data);
                 throw new Error('Invalid response format');
             }
 
-            // Ensure servicesData is an array
-            if (!Array.isArray(servicesData)) {
-                servicesData = [];
-            }
+            // Sort by createdAt in descending order (newest first)
+            servicesData.sort((a, b) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
 
-            // Map the data with safe key generation
             const servicesWithKeys = servicesData.map((service: Service) => ({
                 ...service,
                 key: service._id || generateUniqueId()
             }));
 
             setServices(servicesWithKeys);
-            setError(null); // Clear any previous errors
+            setError(null);
         } catch (error) {
-            console.error("Error fetching leads:", error);
-            if (axios.isAxiosError(error)) {
-                setError(`Failed to fetch leads: ${error.response?.data?.message || error.message}`);
-            } else {
-                setError("Failed to fetch leads.");
-            }
-            setServices([]); // Set empty array on error
+            console.error("Error fetching services:", error);
+            setError("Failed to fetch services.");
+            setServices([]);
         }
     };
 
@@ -191,9 +174,18 @@ export default function AdminServiceTable() {
 
     const sortedItems = React.useMemo(() => {
         return [...items].sort((a, b) => {
-            const first = a[sortDescriptor.column as keyof Service];
-            const second = b[sortDescriptor.column as keyof Service];
-            const cmp = first < second ? -1 : first > second ? 1 : 0;
+            // Handle date fields specially
+            if (sortDescriptor.column === 'date' || sortDescriptor.column === 'createdAt') {
+                const dateA = new Date(a[sortDescriptor.column]).getTime();
+                const dateB = new Date(b[sortDescriptor.column]).getTime();
+                const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+                return sortDescriptor.direction === "descending" ? -cmp : cmp;
+            }
+
+            // Default string comparison
+            const first = a[sortDescriptor.column as keyof Service] || '';
+            const second = b[sortDescriptor.column as keyof Service] || '';
+            const cmp = String(first).localeCompare(String(second));
 
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
@@ -304,82 +296,82 @@ export default function AdminServiceTable() {
     }, []);
 
 
-const topContent = React.useMemo(() => {
-    return (
-        <div className="flex justify-between items-center gap-4">
-            <Input
-                isClearable
-                className="w-full max-w-[300px]"
-                placeholder="Search by name or GST"
-                startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
-                value={filterValue}
-                onChange={(e) => setFilterValue(e.target.value)}
-                onClear={() => setFilterValue("")}
-            />
-            <label className="flex items-center text-default-400 text-small">
-                Rows per page:
-                <select
-                    className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
-                    onChange={onRowsPerPageChange}
-                    defaultValue="5"
-                >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="15">15</option>
-                </select>
-            </label>
-        </div>
-    );
-}, [filterValue, onRowsPerPageChange, services.length,onSearchChange,]);
-
-
-const bottomContent = React.useMemo(() => {
-    return (
-        <div className="py-2 px-2 relative flex justify-between items-center">
-            <span className="text-default-400 text-small">
-                Total {services.length} services
-            </span>
-
-            {/* Centered Pagination */}
-            <div className="absolute left-1/2 transform -translate-x-1/2">
-                <Pagination
-                    isCompact
-                    showShadow
-                    color="success"
-                    page={page}
-                    total={pages}
-                    onChange={setPage}
-                    classNames={{
-                        cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
-                        item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
-                    }}
+    const topContent = React.useMemo(() => {
+        return (
+            <div className="flex justify-between items-center gap-4">
+                <Input
+                    isClearable
+                    className="w-full max-w-[300px]"
+                    placeholder="Search by name or GST"
+                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    onClear={() => setFilterValue("")}
                 />
+                <label className="flex items-center text-default-400 text-small">
+                    Rows per page:
+                    <select
+                        className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
+                        onChange={onRowsPerPageChange}
+                        defaultValue="5"
+                    >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                    </select>
+                </label>
             </div>
+        );
+    }, [filterValue, onRowsPerPageChange, services.length, onSearchChange,]);
 
-            {/* Navigation Buttons */}
-            <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
-                <Button
-                    className="bg-[hsl(339.92deg_91.04%_52.35%)]"
-                    variant="default"
-                    size="sm"
-                    disabled={page === 1}
-                    onClick={onPreviousPage}
-                >
-                    Previous
-                </Button>
-                <Button
-                    className="bg-[hsl(339.92deg_91.04%_52.35%)]"
-                    variant="default"
-                    size="sm"
-                    disabled={page === pages}
-                    onClick={onNextPage}
-                >
-                    Next
-                </Button>
+
+    const bottomContent = React.useMemo(() => {
+        return (
+            <div className="py-2 px-2 relative flex justify-between items-center">
+                <span className="text-default-400 text-small">
+                    Total {services.length} services
+                </span>
+
+                {/* Centered Pagination */}
+                <div className="absolute left-1/2 transform -translate-x-1/2">
+                    <Pagination
+                        isCompact
+                        showShadow
+                        color="success"
+                        page={page}
+                        total={pages}
+                        onChange={setPage}
+                        classNames={{
+                            cursor: "bg-[hsl(339.92deg_91.04%_52.35%)] shadow-md",
+                            item: "data-[active=true]:bg-[hsl(339.92deg_91.04%_52.35%)] data-[active=true]:text-white rounded-lg",
+                        }}
+                    />
+                </div>
+
+                {/* Navigation Buttons */}
+                <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
+                    <Button
+                        className="bg-[hsl(339.92deg_91.04%_52.35%)]"
+                        variant="default"
+                        size="sm"
+                        disabled={page === 1}
+                        onClick={onPreviousPage}
+                    >
+                        Previous
+                    </Button>
+                    <Button
+                        className="bg-[hsl(339.92deg_91.04%_52.35%)]"
+                        variant="default"
+                        size="sm"
+                        disabled={page === pages}
+                        onClick={onNextPage}
+                    >
+                        Next
+                    </Button>
+                </div>
             </div>
-        </div>
-    );
-}, [selectedKeys, page, pages, onPreviousPage, onNextPage, items.length ,hasSearchFilter]);
+        );
+    }, [selectedKeys, page, pages, onPreviousPage, onNextPage, items.length, hasSearchFilter]);
 
     const handleSelectionChange = (keys: Selection) => {
         if (keys === "all") {
@@ -466,33 +458,33 @@ const bottomContent = React.useMemo(() => {
         if (columnKey === "actions") {
             return (
                 <div className="relative flex items-center gap-2">
-                 <Tooltip>
+                    <Tooltip>
                         <span
                             className="text-lg text-info cursor-pointer active:opacity-50"
                             onClick={(e) => {
-                                    e.preventDefault();
-                                    handleDownload(service._id);
-                                }}
+                                e.preventDefault();
+                                handleDownload(service._id);
+                            }}
                         >
                             {isDownloading === service._id ? (
-                                    <Loader2 className="h-6 w-6 animate-spin" />
-                                ) : (
-                                    <FileDown className="h-6 w-6" />
-                                )}
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                            ) : (
+                                <FileDown className="h-6 w-6" />
+                            )}
                         </span>
                     </Tooltip>
                     <Tooltip>
                         <span
                             className="text-lg text-info cursor-pointer active:opacity-50"
                             onClick={(e) => {
-                                    e.preventDefault();
-                                    router.push(`serviceform?id=${service._id}`);
-                                }}
+                                e.preventDefault();
+                                router.push(`serviceform?id=${service._id}`);
+                            }}
                         >
                             <Edit2Icon className="h-6 w-6" />
                         </span>
                     </Tooltip>
-    
+
                     <Tooltip>
                         <span
                             className="text-lg text-danger cursor-pointer active:opacity-50"
@@ -538,46 +530,61 @@ const bottomContent = React.useMemo(() => {
                             <CardTitle className="text-3xl font-bold text-center">Service Record</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            
-                                <Table
-                                    isHeaderSticky
-                                    aria-label="Leads table with custom cells, pagination and sorting"
-                                    bottomContent={bottomContent}
-                                    bottomContentPlacement="outside"
-                                    classNames={{
-                                        wrapper: "max-h-[382px] ower-flow-y-auto",
-                                    }}
-                                    selectedKeys={selectedKeys}
-                                    sortDescriptor={sortDescriptor}
-                                    topContent={topContent}
-                                    topContentPlacement="outside"
-                                    onSelectionChange={handleSelectionChange}
-                                    onSortChange={(descriptor) => {
-                                        setSortDescriptor({
-                                            column: descriptor.column as string,
-                                            direction: descriptor.direction as "ascending" | "descending",
-                                        });
-                                    }}
-                                >
-                                    <TableHeader columns={headerColumns}>
-                                        {(column) => (
-                                            <TableColumn
-                                                key={column.uid}
-                                                align={column.uid === "actions" ? "center" : "start"}
-                                                allowsSorting={column.sortable}
-                                            >
+
+                            <Table
+                                isHeaderSticky
+                                aria-label="Leads table with custom cells, pagination and sorting"
+                                bottomContent={bottomContent}
+                                bottomContentPlacement="outside"
+                                classNames={{
+                                    wrapper: "max-h-[382px] ower-flow-y-auto",
+                                }}
+                                selectedKeys={selectedKeys}
+                                sortDescriptor={sortDescriptor}
+                                topContent={topContent}
+                                topContentPlacement="outside"
+                                onSelectionChange={handleSelectionChange}
+                                onSortChange={(descriptor) => {
+                                    setSortDescriptor({
+                                        column: descriptor.column as string,
+                                        direction: descriptor.direction as "ascending" | "descending",
+                                    });
+                                }}
+                            >
+                                <TableHeader columns={headerColumns}>
+                                    {(column) => (
+                                        <TableColumn
+                                            key={column.uid}
+                                            align={column.uid === "actions" ? "center" : "start"}
+                                            allowsSorting={column.sortable}
+                                            onClick={() => {
+                                                setSortDescriptor(prev => ({
+                                                    column: column.uid,
+                                                    direction: prev.column === column.uid && prev.direction === 'ascending'
+                                                        ? 'descending'
+                                                        : 'ascending'
+                                                }));
+                                            }}
+                                        >
+                                            <div className="flex items-center">
                                                 {column.name}
-                                            </TableColumn>
-                                        )}
-                                    </TableHeader>
-                                    <TableBody emptyContent={"No service found"} items={sortedItems}>
-                                        {(item) => (
-                                            <TableRow key={item._id}>
-                                                {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Service, columnKey as string)}</TableCell>}
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
+                                                {sortDescriptor.column === column.uid && (
+                                                    <span className="ml-1">
+                                                        {sortDescriptor.direction === 'ascending' ? '↑' : '↓'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableColumn>
+                                    )}
+                                </TableHeader>
+                                <TableBody emptyContent={"No service found"} items={sortedItems}>
+                                    {(item) => (
+                                        <TableRow key={item._id}>
+                                            {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Service, columnKey as string)}</TableCell>}
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
                         </CardContent>
                     </Card>
                 </div>

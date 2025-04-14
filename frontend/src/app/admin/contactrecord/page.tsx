@@ -57,10 +57,14 @@ export default function ContactPersonDetailsTable() {
     const [filterValue, setFilterValue] = useState<string>("");
 
     const [isDownloading, setIsDownloading] = useState<boolean | null>(null);
-    const [sortDescriptor, setSortDescriptor] = useState({
-        column: "firstName",
-        direction: "ascending",
+    const [sortDescriptor, setSortDescriptor] = useState<{
+        column: string | null;
+        direction: "ascending" | "descending";
+    }>({
+        column: "_id", // or "createdAt" if available
+        direction: "descending", // newest first
     });
+
 
     const router = useRouter();
     const hasSearchFilter = Boolean(filterValue);
@@ -78,10 +82,11 @@ export default function ContactPersonDetailsTable() {
                 }
             );
             let contactPersonsData = response.data.data || [];
-
-            // Add newly fetched data at the top
-            setContactPersons(prev => [...contactPersonsData, ...prev]); // Prepend the data
-
+            contactPersonsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            
+            // Replace the entire array with the new sorted data
+            setContactPersons(contactPersonsData);
+    
             setError(null);
         } catch (error) {
             console.error("Error fetching contact persons:", error);
@@ -112,13 +117,15 @@ export default function ContactPersonDetailsTable() {
             toast({
                 title: "Delete Successful!",
                 description: "Contact person deleted successfully!",
-            });        } catch (error) {
+            });
+        } catch (error) {
             console.error("Error deleting contact person:", error);
             toast({
                 title: "Error",
                 description: "Failed to delete contact person.",
                 variant: "destructive",
-            });        }
+            });
+        }
     };
 
 
@@ -140,6 +147,8 @@ export default function ContactPersonDetailsTable() {
     }, [contactPersons, filterValue, hasSearchFilter]);
 
     const sortedItems = React.useMemo(() => {
+        if (!sortDescriptor.column) return filteredItems;
+
         return [...filteredItems].sort((a, b) => {
             const first = a[sortDescriptor.column as keyof ContactPerson] || "";
             const second = b[sortDescriptor.column as keyof ContactPerson] || "";
@@ -151,6 +160,7 @@ export default function ContactPersonDetailsTable() {
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
     }, [filteredItems, sortDescriptor]);
+
 
 
     // Pagination logic
@@ -208,7 +218,7 @@ export default function ContactPersonDetailsTable() {
                 <span className="text-default-400 text-small">
                     Total {contactPersons.length} contacts
                 </span>
-    
+
                 {/* Centered Pagination */}
                 <div className="absolute left-1/2 transform -translate-x-1/2">
                     <Pagination
@@ -224,7 +234,7 @@ export default function ContactPersonDetailsTable() {
                         }}
                     />
                 </div>
-    
+
                 {/* Navigation Buttons */}
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
@@ -249,7 +259,7 @@ export default function ContactPersonDetailsTable() {
             </div>
         );
     }, [page, pages, onPreviousPage, onNextPage]);
-    
+
 
     const renderCell = useCallback((contact: ContactPerson, columnKey: string) => {
         if (columnKey === "actions") {
@@ -319,7 +329,32 @@ export default function ContactPersonDetailsTable() {
                             <Table>
                                 <TableHeader>
                                     {columns.map((column) => (
-                                        <TableColumn key={column.uid}>{column.name}</TableColumn>
+                                        <TableColumn
+                                            key={column.uid}
+                                            allowsSorting={column.sortable}
+                                            onClick={() => {
+                                                setSortDescriptor((prev) => {
+                                                    if (prev.column === column.uid) {
+                                                        return {
+                                                            column: column.uid,
+                                                            direction: prev.direction === "ascending" ? "descending" : "ascending",
+                                                        };
+                                                    } else {
+                                                        return {
+                                                            column: column.uid,
+                                                            direction: "ascending",
+                                                        };
+                                                    }
+                                                });
+                                            }}
+                                        >
+                                            {column.name}
+                                            {sortDescriptor.column === column.uid && (
+                                                <span className="ml-1 text-xs">
+                                                    {sortDescriptor.direction === "ascending" ? "↑" : "↓"}
+                                                </span>
+                                            )}
+                                        </TableColumn>
                                     ))}
                                 </TableHeader>
                                 <TableBody emptyContent={"No companies found"} items={paginatedItems}>

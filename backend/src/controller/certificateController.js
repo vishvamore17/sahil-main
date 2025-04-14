@@ -129,7 +129,7 @@ const downloadCertificate = async (req, res) => {
             return res.status(404).json({ error: "Certificate not found in database" });
         }
 
-        const pdfPath = path.join(process.cwd(), "certificates", `${certificateId}.pdf`);
+        const pdfPath = path.join(__dirname, 'certificates', `${req.params.id}.pdf`);
         console.log("Looking for PDF at path:", pdfPath);
 
         if (!fs.existsSync(pdfPath)) {

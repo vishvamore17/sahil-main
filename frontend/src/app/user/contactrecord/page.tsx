@@ -26,7 +26,7 @@ interface ContactPerson {
     designation: string;
     _id: string;
     key?: string;
-
+    createdAt?: string; // Add this
 }
 
 const generateUniqueId = () => {
@@ -55,9 +55,9 @@ export default function ContactPersonDetailsTable() {
 
     const [isDownloading, setIsDownloading] = useState<boolean | null>(null);
     const [sortDescriptor, setSortDescriptor] = useState({
-        column: "firstName",
-        direction: "ascending",
-    });
+        column: "createdAt", // Change from "firstName" to "createdAt"
+        direction: "descending", // Newest first
+      });
 
     const router = useRouter();
     const hasSearchFilter = Boolean(filterValue);
@@ -74,10 +74,17 @@ export default function ContactPersonDetailsTable() {
                     },
                 }
             );
+
             let contactPersonsData = response.data.data || [];
 
-            setContactPersons(prev => [...contactPersonsData, ...prev]);
+            // Sort by createdAt descending (newest first)
+            contactPersonsData.sort((a: ContactPerson, b: ContactPerson) => {
+                const dateA = new Date(a.createdAt || 0).getTime();
+                const dateB = new Date(b.createdAt || 0).getTime();
+                return dateB - dateA;
+            });
 
+            setContactPersons(contactPersonsData);
             setError(null);
         } catch (error) {
             console.error("Error fetching contact persons:", error);
@@ -133,13 +140,13 @@ export default function ContactPersonDetailsTable() {
             const first = a[sortDescriptor.column as keyof ContactPerson] || "";
             const second = b[sortDescriptor.column as keyof ContactPerson] || "";
 
-            let cmp = 0;
-            if (first < second) cmp = -1;
-            if (first > second) cmp = 1;
+            // Case-insensitive string comparison
+            const cmp = String(first).localeCompare(String(second), undefined, { sensitivity: 'base' });
 
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
     }, [filteredItems, sortDescriptor]);
+
 
     const paginatedItems = React.useMemo(() => {
         const start = (page - 1) * rowsPerPage;
@@ -165,14 +172,14 @@ export default function ContactPersonDetailsTable() {
         return (
             <div className="flex justify-between gap-3 items-end">
                 <Input
-                                    isClearable
-                                    className="w-full max-w-[300px]"
-                                    placeholder="Search by name or GST"
-                                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
-                                    value={filterValue}
-                                    onChange={(e) => setFilterValue(e.target.value)}
-                                    onClear={() => setFilterValue("")}
-                                />
+                    isClearable
+                    className="w-full max-w-[300px]"
+                    placeholder="Search by name or GST"
+                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    onClear={() => setFilterValue("")}
+                />
                 <label className="flex items-center text-default-400 text-small">
                     Rows per page:
                     <select
@@ -299,7 +306,27 @@ export default function ContactPersonDetailsTable() {
                             <Table>
                                 <TableHeader>
                                     {columns.map((column) => (
-                                        <TableColumn key={column.uid}>{column.name}</TableColumn>
+                                        <TableColumn
+                                            key={column.uid}
+                                            onClick={() => {
+                                                setSortDescriptor(prev => ({
+                                                    column: column.uid,
+                                                    direction: prev.column === column.uid && prev.direction === "ascending"
+                                                        ? "descending"
+                                                        : "ascending"
+                                                }));
+                                            }}
+                                            className="cursor-pointer"
+                                        >
+                                            <div className="flex items-center">
+                                                {column.name}
+                                                {sortDescriptor.column === column.uid && (
+                                                    <span className="ml-1">
+                                                        {sortDescriptor.direction === "ascending" ? "↑" : "↓"}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableColumn>
                                     ))}
                                 </TableHeader>
                                 <TableBody emptyContent={"No companies found"} items={paginatedItems}>

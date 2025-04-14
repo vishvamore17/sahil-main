@@ -21,12 +21,14 @@ interface User {
   email: string;
   contact: string;
   key?: string;
+  createdAt?: string; // Add this
 }
 
 const columns = [
   { name: "Name", uid: "name", sortable: true },
   { name: "Email", uid: "email", sortable: true },
   { name: "Contact", uid: "contact", sortable: true },
+  // { name: "Created At", uid: "createdAt", sortable: true }, // Optional
   { name: "Action", uid: "actions", sortable: false },
 ];
 
@@ -40,8 +42,8 @@ export default function UserTable() {
   const router = useRouter();
 
   const [sortDescriptor, setSortDescriptor] = useState({
-    column: "name",
-    direction: "ascending" as "ascending" | "descending",
+    column: "createdAt", // Changed from "name"
+    direction: "descending" as "ascending" | "descending", // Newest first
   });
 
   const fetchUsers = async () => {
@@ -55,13 +57,21 @@ export default function UserTable() {
           }
         }
       );
-      
-      const usersData = response.data.data || response.data || [];
+
+      let usersData = response.data.data || response.data || [];
+
+      // Sort by createdAt descending (newest first)
+      usersData.sort((a: User, b: User) => {
+        const dateA = new Date(a.createdAt || 0).getTime();
+        const dateB = new Date(b.createdAt || 0).getTime();
+        return dateB - dateA;
+      });
+
       const usersWithKeys = usersData.map((user: User) => ({
         ...user,
         key: user._id
       }));
-      
+
       setUsers(usersWithKeys);
     } catch (error) {
       console.error("Failed to fetch users", error);
@@ -91,13 +101,15 @@ export default function UserTable() {
       toast({
         title: "Delete Successful!",
         description: "User deleted successfully!",
-      })    } catch (error) {
+      })
+    } catch (error) {
       console.error("Failed to delete user", error);
       toast({
         title: "Error",
         description: "Failed to delete user.",
         variant: "destructive",
-      })    }
+      })
+    }
   };
 
   const filteredItems = React.useMemo(() => {
@@ -119,13 +131,20 @@ export default function UserTable() {
       const first = a[sortDescriptor.column as keyof User] || "";
       const second = b[sortDescriptor.column as keyof User] || "";
 
-      let cmp = 0;
-      if (first < second) cmp = -1;
-      if (first > second) cmp = 1;
+      // Special handling for createdAt field
+      if (sortDescriptor.column === 'createdAt') {
+        const dateA = new Date(first as string).getTime();
+        const dateB = new Date(second as string).getTime();
+        const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+        return sortDescriptor.direction === "descending" ? -cmp : cmp;
+      }
 
+      // Case-insensitive string comparison for other fields
+      const cmp = String(first).localeCompare(String(second), undefined, { sensitivity: 'base' });
       return sortDescriptor.direction === "descending" ? -cmp : cmp;
     });
   }, [filteredItems, sortDescriptor]);
+
 
   const paginatedItems = React.useMemo(() => {
     const start = (page - 1) * rowsPerPage;
@@ -280,7 +299,27 @@ export default function UserTable() {
               <Table>
                 <TableHeader>
                   {columns.map((column) => (
-                    <TableColumn key={column.uid}>{column.name}</TableColumn>
+                    <TableColumn
+                      key={column.uid}
+                      onClick={() => {
+                        setSortDescriptor(prev => ({
+                          column: column.uid,
+                          direction: prev.column === column.uid && prev.direction === "ascending"
+                            ? "descending"
+                            : "ascending"
+                        }));
+                      }}
+                      className={column.sortable ? "cursor-pointer" : ""}
+                    >
+                      <div className="flex items-center">
+                        {column.name}
+                        {sortDescriptor.column === column.uid && column.sortable && (
+                          <span className="ml-1">
+                            {sortDescriptor.direction === "ascending" ? "↑" : "↓"}
+                          </span>
+                        )}
+                      </div>
+                    </TableColumn>
                   ))}
                 </TableHeader>
                 <TableBody emptyContent={"No users found"} items={paginatedItems}>

@@ -32,6 +32,7 @@ interface Certificate {
   dateOfCalibration: string;
   calibrationDueDate: string;
   engineerName: string;
+  createdAt?: string; // Add this if your backend provides it
   [key: string]: string;
 }
 
@@ -82,8 +83,8 @@ export default function CertificateTable() {
   const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
   const [rowsPerPage, setRowsPerPage] = useState(15);
   const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
-    column: "certificateNo",
-    direction: "ascending",
+    column: "dateOfCalibration", // or "createdAt" if you have that field
+    direction: "descending", // Newest first
   });
   const [page, setPage] = React.useState(1);
   const router = useRouter();
@@ -102,48 +103,33 @@ export default function CertificateTable() {
         }
       );
 
-      // Log the response structure
-      console.log('Full API Response:', {
-        status: response.status,
-        data: response.data,
-        type: typeof response.data,
-        hasData: 'data' in response.data
-      });
-
-      // Handle the response based on its structure
       let certificatesData;
       if (typeof response.data === 'object' && 'data' in response.data) {
-        // Response format: { data: [...certificates] }
         certificatesData = response.data.data;
       } else if (Array.isArray(response.data)) {
-        // Response format: [...certificates]
         certificatesData = response.data;
       } else {
-        console.error('Unexpected response format:', response.data);
-        throw new Error('Invalid response format');
-      }
-
-      // Ensure certificatesData is an array
-      if (!Array.isArray(certificatesData)) {
         certificatesData = [];
       }
 
-      // Map the data with safe key generation
-      const certificatesWithKeys = certificatesData.map((certificate: Certificate) => ({
+      // Sort by date in descending order (newest first)
+      const sortedData = certificatesData.sort((a: Certificate, b: Certificate) => {
+        const dateA = new Date(a.dateOfCalibration || a.createdAt || 0).getTime();
+        const dateB = new Date(b.dateOfCalibration || b.createdAt || 0).getTime();
+        return dateB - dateA; // Descending order
+      });
+
+      const certificatesWithKeys = sortedData.map((certificate: Certificate) => ({
         ...certificate,
         key: certificate._id || generateUniqueId()
       }));
 
       setCertificates(certificatesWithKeys);
-      setError(null); // Clear any previous errors
+      setError(null);
     } catch (error) {
-      console.error("Error fetching leads:", error);
-      if (axios.isAxiosError(error)) {
-        setError(`Failed to fetch leads: ${error.response?.data?.message || error.message}`);
-      } else {
-        setError("Failed to fetch leads.");
-      }
-      setCertificates([]); // Set empty array on error
+      console.error("Error fetching certificates:", error);
+      setError("Failed to fetch certificates.");
+      setCertificates([]);
     }
   };
 
@@ -186,8 +172,27 @@ export default function CertificateTable() {
     return [...items].sort((a, b) => {
       const first = a[sortDescriptor.column as keyof Certificate];
       const second = b[sortDescriptor.column as keyof Certificate];
-      const cmp = first < second ? -1 : first > second ? 1 : 0;
 
+      // Handle date fields specially
+      if (sortDescriptor.column.includes('Date') || sortDescriptor.column === 'dateOfCalibration' || sortDescriptor.column === 'calibrationDueDate') {
+        const dateA = new Date(first as string).getTime();
+        const dateB = new Date(second as string).getTime();
+        const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+        return sortDescriptor.direction === "descending" ? -cmp : cmp;
+      }
+
+      // Handle numeric fields
+      if (sortDescriptor.column === 'certificateNo') {
+        const numA = parseInt(first as string, 10);
+        const numB = parseInt(second as string, 10);
+        if (!isNaN(numA) && !isNaN(numB)) {
+          const cmp = numA < numB ? -1 : numA > numB ? 1 : 0;
+          return sortDescriptor.direction === "descending" ? -cmp : cmp;
+        }
+      }
+
+      // Default string comparison
+      const cmp = String(first).localeCompare(String(second));
       return sortDescriptor.direction === "descending" ? -cmp : cmp;
     });
   }, [sortDescriptor, items]);
@@ -307,8 +312,8 @@ export default function CertificateTable() {
   const onClear = React.useCallback(() => {
     setFilterValue("");
     setPage(1);
-  }, []); 
-  
+  }, []);
+
   const topContent = React.useMemo(() => {
     return (
       <div className="flex justify-between items-center gap-4">
@@ -447,7 +452,15 @@ export default function CertificateTable() {
               align={column.uid === "actions" ? "center" : "start"}
               allowsSorting={column.sortable}
             >
-              {column.name}
+              <div className="flex items-center">
+                {column.name}
+                {sortDescriptor.column === column.uid && (
+                  <ChevronDownIcon
+                    className={`ml-2 h-4 w-4 transition-transform ${sortDescriptor.direction === "ascending" ? "rotate-180" : ""
+                      }`}
+                  />
+                )}
+              </div>
             </TableColumn>
           )}
         </TableHeader>

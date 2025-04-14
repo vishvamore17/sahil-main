@@ -59,42 +59,50 @@ export default function CompanyDetailsTable() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDownloading, setIsDownloading] = useState<string | null>(null);
 
-    const [sortDescriptor, setSortDescriptor] = useState({
-        column: "companyName",
-        direction: "ascending" as "ascending" | "descending",
-    });
-
+  const [sortDescriptor, setSortDescriptor] = useState<{
+          column: string | null;
+          direction: "ascending" | "descending";
+      }>({
+          column: null,
+          direction: "ascending",
+      });
+      
     const router = useRouter();
     const hasSearchFilter = Boolean(filterValue);
 
-    const fetchCompanies = async () => {
-        try {
-            const response = await axios.get(
-                `http://localhost:5000/api/v1/company/getAllcompanies`,
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem("token")}`
+     const fetchCompanies = async () => {
+            try {
+                const response = await axios.get(
+                    `http://localhost:5000/api/v1/company/getAllcompanies`,
+                    {
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${localStorage.getItem("token")}`
+                        }
                     }
-                }
-            );
-
-            let companiesData = Array.isArray(response.data) ? response.data :
-                response.data?.data ? response.data.data : [];
-
-            const companiesWithKeys = companiesData.map((company: CompanyDetails) => ({
-                ...company,
-                key: company._id || generateUniqueId()
-            }));
-
-            setCompanies(companiesWithKeys);
-            setError(null);
-        } catch (error) {
-            console.error("Error fetching companies:", error);
-            setError("Failed to fetch companies. Please try again.");
-            setCompanies([]);
-        }
-    };
+                );
+    
+                const companiesData = Array.isArray(response.data)
+                    ? response.data
+                    : response.data?.data
+                        ? response.data.data
+                        : [];
+    
+                const companiesWithKeys = companiesData
+                    .reverse() // 👈 Latest added data comes first
+                    .map((company: CompanyDetails) => ({
+                        ...company,
+                        key: company._id || generateUniqueId(),
+                    }));
+    
+                setCompanies(companiesWithKeys);
+                setError(null);
+            } catch (error) {
+                console.error("Error fetching companies:", error);
+                setError("Failed to fetch companies. Please try again.");
+                setCompanies([]);
+            }
+        };
 
     useEffect(() => {
         fetchCompanies();
@@ -142,19 +150,24 @@ export default function CompanyDetailsTable() {
         return filtered;
     }, [companies, filterValue, hasSearchFilter]);
 
-    const sortedItems = React.useMemo(() => {
-        return [...filteredItems].sort((a, b) => {
-            const first = a[sortDescriptor.column as keyof CompanyDetails] || "";
-            const second = b[sortDescriptor.column as keyof CompanyDetails] || "";
-
-            let cmp = 0;
-            if (first < second) cmp = -1;
-            if (first > second) cmp = 1;
-
-            return sortDescriptor.direction === "descending" ? -cmp : cmp;
-        });
-    }, [filteredItems, sortDescriptor]);
-
+      const sortedItems = React.useMemo(() => {
+          if (!sortDescriptor.column) {
+              // No sorting = just show as-is (which is reversed from fetch)
+              return filteredItems;
+          }
+      
+          return [...filteredItems].sort((a, b) => {
+              const first = a[sortDescriptor.column as keyof CompanyDetails] || "";
+              const second = b[sortDescriptor.column as keyof CompanyDetails] || "";
+      
+              let cmp = 0;
+              if (first < second) cmp = -1;
+              if (first > second) cmp = 1;
+      
+              return sortDescriptor.direction === "descending" ? -cmp : cmp;
+          });
+      }, [filteredItems, sortDescriptor]);
+      
     const paginatedItems = React.useMemo(() => {
         const start = (page - 1) * rowsPerPage;
         return sortedItems.slice(start, start + rowsPerPage);
@@ -333,17 +346,32 @@ export default function CompanyDetailsTable() {
                                     });
                                 }}
                             >
-                                <TableHeader columns={headerColumns}>
-                                    {(column) => (
-                                        <TableColumn
-                                            key={column.uid}
-                                            align={column.uid === "actions" ? "center" : "start"}
-                                            allowsSorting={column.sortable}
-                                        >
-                                            {column.name}
-                                        </TableColumn>
-                                    )}
-                                </TableHeader>
+                              <TableHeader>
+                                                                  {columns.map((column) => (
+                                                                      <TableColumn
+                                                                          key={column.uid}
+                                                                          allowsSorting={column.sortable}
+                                                                          onClick={() => {
+                                                                              if (!column.sortable) return;
+                                                                              setSortDescriptor(prev => ({
+                                                                                  column: column.uid,
+                                                                                  direction:
+                                                                                      prev.column === column.uid && prev.direction === "ascending"
+                                                                                          ? "descending"
+                                                                                          : "ascending",
+                                                                              }));
+                                                                          }}
+                                                                          style={{ cursor: column.sortable ? "pointer" : "default" }}
+                                                                      >
+                                                                          {column.name}
+                                                                          {sortDescriptor.column === column.uid && (
+                                                                              <span className="ml-1">
+                                                                                  {sortDescriptor.direction === "ascending" ? "▲" : "▼"}
+                                                                              </span>
+                                                                          )}
+                                                                      </TableColumn>
+                                                                  ))}
+                                                              </TableHeader>
                                 <TableBody emptyContent={"No companies found"} items={paginatedItems}>
                                     {(item) => (
                                         <TableRow key={item._id}>

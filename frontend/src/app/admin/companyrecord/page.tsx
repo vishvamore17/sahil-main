@@ -54,11 +54,14 @@ export default function CompanyDetailsTable() {
     const [page, setPage] = useState(1);
     const [filterValue, setFilterValue] = useState("");
     const [isDownloading, setIsDownloading] = useState<string | null>(null);
-    const [sortDescriptor, setSortDescriptor] = useState({
-        column: "companyName",
-        direction: "ascending" as "ascending" | "descending",
+    const [sortDescriptor, setSortDescriptor] = useState<{
+        column: string | null;
+        direction: "ascending" | "descending";
+    }>({
+        column: null,
+        direction: "ascending",
     });
-
+    
     const router = useRouter();
     const hasSearchFilter = Boolean(filterValue);
 
@@ -73,15 +76,20 @@ export default function CompanyDetailsTable() {
                     }
                 }
             );
-    
-            let companiesData = Array.isArray(response.data) ? response.data : 
-                              response.data?.data ? response.data.data : [];
-            
-            const companiesWithKeys = companiesData.map((company: CompanyDetails) => ({
-                ...company,
-                key: company._id || generateUniqueId()
-            }));
-    
+
+            const companiesData = Array.isArray(response.data)
+                ? response.data
+                : response.data?.data
+                    ? response.data.data
+                    : [];
+
+            const companiesWithKeys = companiesData
+                .reverse() // 👈 Latest added data comes first
+                .map((company: CompanyDetails) => ({
+                    ...company,
+                    key: company._id || generateUniqueId(),
+                }));
+
             setCompanies(companiesWithKeys);
             setError(null);
         } catch (error) {
@@ -90,7 +98,7 @@ export default function CompanyDetailsTable() {
             setCompanies([]);
         }
     };
-    
+
     useEffect(() => {
         fetchCompanies();
     }, []);
@@ -115,21 +123,23 @@ export default function CompanyDetailsTable() {
             toast({
                 title: "Delete Successful!",
                 description: "Company deleted successfully!",
-            });        } catch (error) {
+            });
+        } catch (error) {
             console.error("Error deleting company:", error);
             toast({
                 title: "Error",
                 description: "Failed to delete company.",
                 variant: "destructive",
-            });             }
+            });
+        }
     };
 
     const filteredItems = React.useMemo(() => {
         let filtered = [...companies];
-        
+
         if (hasSearchFilter) {
             const searchLower = filterValue.toLowerCase();
-            filtered = filtered.filter(company => 
+            filtered = filtered.filter(company =>
                 company.companyName.toLowerCase().includes(searchLower) ||
                 company.gstNumber.toLowerCase().includes(searchLower)
             );
@@ -139,17 +149,23 @@ export default function CompanyDetailsTable() {
     }, [companies, filterValue, hasSearchFilter]);
 
     const sortedItems = React.useMemo(() => {
+        if (!sortDescriptor.column) {
+            // No sorting = just show as-is (which is reversed from fetch)
+            return filteredItems;
+        }
+    
         return [...filteredItems].sort((a, b) => {
             const first = a[sortDescriptor.column as keyof CompanyDetails] || "";
             const second = b[sortDescriptor.column as keyof CompanyDetails] || "";
-            
+    
             let cmp = 0;
             if (first < second) cmp = -1;
             if (first > second) cmp = 1;
-            
+    
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
     }, [filteredItems, sortDescriptor]);
+    
 
     const paginatedItems = React.useMemo(() => {
         const start = (page - 1) * rowsPerPage;
@@ -205,7 +221,7 @@ export default function CompanyDetailsTable() {
                 <span className="text-default-400 text-small">
                     Total {companies.length} companies
                 </span>
-    
+
                 {/* Centered Pagination */}
                 <div className="absolute left-1/2 transform -translate-x-1/2">
                     <Pagination
@@ -221,7 +237,7 @@ export default function CompanyDetailsTable() {
                         }}
                     />
                 </div>
-    
+
                 {/* Navigation Buttons */}
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
@@ -256,7 +272,7 @@ export default function CompanyDetailsTable() {
                             className="text-lg text-info cursor-pointer active:opacity-50"
                             onClick={(e) => {
                                 e.preventDefault();
-                                router.push(`companyform?id=${company._id}`); 
+                                router.push(`companyform?id=${company._id}`);
                             }}
                         >
                             <Edit2Icon className="h-6 w-6" />
@@ -316,7 +332,28 @@ export default function CompanyDetailsTable() {
                             <Table>
                                 <TableHeader>
                                     {columns.map((column) => (
-                                        <TableColumn key={column.uid}>{column.name}</TableColumn>
+                                        <TableColumn
+                                            key={column.uid}
+                                            allowsSorting={column.sortable}
+                                            onClick={() => {
+                                                if (!column.sortable) return;
+                                                setSortDescriptor(prev => ({
+                                                    column: column.uid,
+                                                    direction:
+                                                        prev.column === column.uid && prev.direction === "ascending"
+                                                            ? "descending"
+                                                            : "ascending",
+                                                }));
+                                            }}
+                                            style={{ cursor: column.sortable ? "pointer" : "default" }}
+                                        >
+                                            {column.name}
+                                            {sortDescriptor.column === column.uid && (
+                                                <span className="ml-1">
+                                                    {sortDescriptor.direction === "ascending" ? "▲" : "▼"}
+                                                </span>
+                                            )}
+                                        </TableColumn>
                                     ))}
                                 </TableHeader>
                                 <TableBody emptyContent={"No companies found"} items={paginatedItems}>

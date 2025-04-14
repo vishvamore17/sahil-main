@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState,useCallback } from "react"
+import React, { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, SearchIcon, FileDown } from "lucide-react"
+import { Loader2, SearchIcon, FileDown, ChevronDownIcon } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection, ChipProps, Select } from "@heroui/react"
@@ -13,7 +13,6 @@ import { useRouter } from "next/navigation";
 interface Service {
     [x: string]: string | null;
     _id: string;
-    // nameAndLocation: string;
     contactPerson: string;
     contactNumber: string;
     serviceEngineer: string;
@@ -49,10 +48,10 @@ const formatDate = (dateString: string): string => {
 };
 
 const columns = [
-    // { name: "NAME & LOCATION", uid: "nameAndLocation", sortable: true, width: "120px" },
     { name: "Contact Person", uid: "contactPerson", sortable: true, width: "120px" },
-    { name: "Contat Number", uid: "contactNumber", sortable: true, width: "120px" },
+    { name: "Contact Number", uid: "contactNumber", sortable: true, width: "120px" },
     { name: "Service Engineer", uid: "serviceEngineer", sortable: true, width: "120px" },
+    { name: "Date", uid: "date", sortable: true, width: "120px" }, // Added date column
     { name: "Report No", uid: "reportNo", sortable: true, width: "120px" },
     { name: "Action", uid: "actions", sortable: true, width: "100px" },
 ];
@@ -81,8 +80,8 @@ export default function Servicetable() {
     const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
-        column: "nameAndLocation",
-        direction: "ascending",
+        column: "createdAt", // This should match your date field name
+        direction: "descending", // Newest first
     });
     const [page, setPage] = React.useState(1);
     const router = useRouter();
@@ -91,62 +90,45 @@ export default function Servicetable() {
 
 
     const fetchServices = async () => {
-        try {
-            const response = await axios.get(
-                "http://localhost:5000/api/v1/services/getServices",
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${localStorage.getItem("token")}`
+            try {
+                const response = await axios.get(
+                    "http://localhost:5000/api/v1/services/getServices",
+                    {
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${localStorage.getItem("token")}`
+                        }
                     }
+                );
+    
+                let servicesData;
+                if (typeof response.data === 'object' && 'data' in response.data) {
+                    servicesData = response.data.data;
+                } else if (Array.isArray(response.data)) {
+                    servicesData = response.data;
+                } else {
+                    throw new Error('Invalid response format');
                 }
-            );
-
-            // Log the response structure
-            console.log('Full API Response:', {
-                status: response.status,
-                data: response.data,
-                type: typeof response.data,
-                hasData: 'data' in response.data
-            });
-
-            // Handle the response based on its structure
-            let servicesData;
-            if (typeof response.data === 'object' && 'data' in response.data) {
-                // Response format: { data: [...services] }
-                servicesData = response.data.data;
-            } else if (Array.isArray(response.data)) {
-                // Response format: [...services]
-                servicesData = response.data;
-            } else {
-                console.error('Unexpected response format:', response.data);
-                throw new Error('Invalid response format');
+    
+                // Sort by createdAt in descending order (newest first)
+                servicesData.sort((a, b) =>
+                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                );
+    
+                const servicesWithKeys = servicesData.map((service: Service) => ({
+                    ...service,
+                    key: service._id || generateUniqueId()
+                }));
+    
+                setServices(servicesWithKeys);
+                setError(null);
+            } catch (error) {
+                console.error("Error fetching services:", error);
+                setError("Failed to fetch services.");
+                setServices([]);
             }
-
-            // Ensure servicesData is an array
-            if (!Array.isArray(servicesData)) {
-                servicesData = [];
-            }
-
-            // Map the data with safe key generation
-            const servicesWithKeys = servicesData.map((service: Service) => ({
-                ...service,
-                key: service._id || generateUniqueId()
-            }));
-
-            setServices(servicesWithKeys);
-            setError(null); // Clear any previous errors
-        } catch (error) {
-            console.error("Error fetching leads:", error);
-            if (axios.isAxiosError(error)) {
-                setError(`Failed to fetch leads: ${error.response?.data?.message || error.message}`);
-            } else {
-                setError("Failed to fetch leads.");
-            }
-            setServices([]); // Set empty array on error
-        }
-    };
-
+        };
+    
     useEffect(() => {
         fetchServices();
     }, []);
@@ -182,15 +164,24 @@ export default function Servicetable() {
         return filteredItems.slice(start, end);
     }, [page, filteredItems, rowsPerPage]);
 
-    const sortedItems = React.useMemo(() => {
-        return [...items].sort((a, b) => {
-            const first = a[sortDescriptor.column as keyof Service];
-            const second = b[sortDescriptor.column as keyof Service];
-            const cmp = first < second ? -1 : first > second ? 1 : 0;
-
-            return sortDescriptor.direction === "descending" ? -cmp : cmp;
-        });
-    }, [sortDescriptor, items]);
+      const sortedItems = React.useMemo(() => {
+          return [...items].sort((a, b) => {
+              // Handle date fields specially
+              if (sortDescriptor.column === 'date' || sortDescriptor.column === 'createdAt') {
+                  const dateA = new Date(a[sortDescriptor.column]).getTime();
+                  const dateB = new Date(b[sortDescriptor.column]).getTime();
+                  const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+                  return sortDescriptor.direction === "descending" ? -cmp : cmp;
+              }
+  
+              // Default string comparison
+              const first = a[sortDescriptor.column as keyof Service] || '';
+              const second = b[sortDescriptor.column as keyof Service] || '';
+              const cmp = String(first).localeCompare(String(second));
+  
+              return sortDescriptor.direction === "descending" ? -cmp : cmp;
+          });
+      }, [sortDescriptor, items]);
 
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -264,8 +255,8 @@ export default function Servicetable() {
             setIsDownloading(null);
         }
     };
-     
-    
+
+
     const onNextPage = React.useCallback(() => {
         if (page < pages) {
             setPage(page + 1);
@@ -297,33 +288,33 @@ export default function Servicetable() {
         setPage(1);
     }, []);
 
-const topContent = React.useMemo(() => {
-    return (
-        <div className="flex justify-between items-center gap-4">
-            <Input
-                isClearable
-                className="w-full max-w-[300px]"
-                placeholder="Search by name or GST"
-                startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
-                value={filterValue}
-                onChange={(e) => setFilterValue(e.target.value)}
-                onClear={() => setFilterValue("")}
-            />
-            <label className="flex items-center text-default-400 text-small">
-                Rows per page:
-                <select
-                    className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
-                    onChange={onRowsPerPageChange}
-                    defaultValue="5"
-                >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="15">15</option>
-                </select>
-            </label>
-        </div>
-    );
-}, [filterValue, onRowsPerPageChange, services.length, onSearchChange, visibleColumns]);
+    const topContent = React.useMemo(() => {
+        return (
+            <div className="flex justify-between items-center gap-4">
+                <Input
+                    isClearable
+                    className="w-full max-w-[300px]"
+                    placeholder="Search by name or GST"
+                    startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
+                    value={filterValue}
+                    onChange={(e) => setFilterValue(e.target.value)}
+                    onClear={() => setFilterValue("")}
+                />
+                <label className="flex items-center text-default-400 text-small">
+                    Rows per page:
+                    <select
+                        className="bg-transparent dark:bg-gray-800 outline-none text-default-400 text-small ml-2"
+                        onChange={onRowsPerPageChange}
+                        defaultValue="5"
+                    >
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="15">15</option>
+                    </select>
+                </label>
+            </div>
+        );
+    }, [filterValue, onRowsPerPageChange, services.length, onSearchChange, visibleColumns]);
 
     const bottomContent = React.useMemo(() => {
         return (
@@ -331,7 +322,7 @@ const topContent = React.useMemo(() => {
                 <span className="text-default-400 text-small">
                     Total {services.length} services
                 </span>
-    
+
                 {/* Centered Pagination */}
                 <div className="absolute left-1/2 transform -translate-x-1/2">
                     <Pagination
@@ -347,7 +338,7 @@ const topContent = React.useMemo(() => {
                         }}
                     />
                 </div>
-    
+
                 {/* Navigation Buttons */}
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
@@ -372,7 +363,7 @@ const topContent = React.useMemo(() => {
             </div>
         );
     }, [selectedKeys, page, pages, onPreviousPage, onNextPage, items.length, hasSearchFilter]);
-    
+
     const handleSelectionChange = (keys: Selection) => {
         if (keys === "all") {
             setSelectedKeys(new Set(services.map(service => service._id)));
@@ -405,48 +396,63 @@ const topContent = React.useMemo(() => {
         }
         return service[columnKey as keyof Service];
     }, []);
-    
+
 
     return (
-            <Table
-                isHeaderSticky
-                aria-label="Leads table with custom cells, pagination and sorting"
-                bottomContent={bottomContent}
-                bottomContentPlacement="outside"
-                classNames={{
-                    wrapper: "max-h-[382px] ower-flow-y-auto",
-                }}
-                selectedKeys={selectedKeys}
-                sortDescriptor={sortDescriptor}
-                topContent={topContent}
-                topContentPlacement="outside"
-                onSelectionChange={handleSelectionChange}
-                onSortChange={(descriptor) => {
-                    setSortDescriptor({
-                        column: descriptor.column as string,
-                        direction: descriptor.direction as "ascending" | "descending",
-                    });
-                }}
-            >
-                <TableHeader columns={headerColumns}>
-                    {(column) => (
-                        <TableColumn
-                            key={column.uid}
-                            align={column.uid === "actions" ? "center" : "start"}
-                            allowsSorting={column.sortable}
-                        >
-                            {column.name}
-                        </TableColumn>
-                    )}
-                </TableHeader>
-                <TableBody emptyContent={"No service found"} items={sortedItems}>
-                    {(item) => (
-                        <TableRow key={item._id}>
-                            {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Service, columnKey as string)}</TableCell>}
-                        </TableRow>
-                    )}
-                </TableBody>
-            </Table>
+        <Table
+            isHeaderSticky
+            aria-label="Leads table with custom cells, pagination and sorting"
+            bottomContent={bottomContent}
+            bottomContentPlacement="outside"
+            classNames={{
+                wrapper: "max-h-[382px] ower-flow-y-auto",
+            }}
+            selectedKeys={selectedKeys}
+            sortDescriptor={sortDescriptor}
+            topContent={topContent}
+            topContentPlacement="outside"
+            onSelectionChange={handleSelectionChange}
+            onSortChange={(descriptor) => {
+                setSortDescriptor({
+                    column: descriptor.column as string,
+                    direction: descriptor.direction as "ascending" | "descending",
+                });
+            }}
+        >
+             <TableHeader columns={headerColumns}>
+                                                {(column) => (
+                                                    <TableColumn
+                                                        key={column.uid}
+                                                        align={column.uid === "actions" ? "center" : "start"}
+                                                        allowsSorting={column.sortable}
+                                                        onClick={() => {
+                                                            setSortDescriptor(prev => ({
+                                                                column: column.uid,
+                                                                direction: prev.column === column.uid && prev.direction === 'ascending'
+                                                                    ? 'descending'
+                                                                    : 'ascending'
+                                                            }));
+                                                        }}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            {column.name}
+                                                            {sortDescriptor.column === column.uid && (
+                                                                <span className="ml-1">
+                                                                    {sortDescriptor.direction === 'ascending' ? '↑' : '↓'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </TableColumn>
+                                                )}
+                                            </TableHeader>
+            <TableBody emptyContent={"No service found"} items={sortedItems}>
+                {(item) => (
+                    <TableRow key={item._id}>
+                        {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Service, columnKey as string)}</TableCell>}
+                    </TableRow>
+                )}
+            </TableBody>
+        </Table>
 
 
     );

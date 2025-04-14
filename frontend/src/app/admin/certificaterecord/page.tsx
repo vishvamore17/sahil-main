@@ -1,13 +1,12 @@
 'use client';
-import React, { useEffect, useState,  useCallback } from "react"
+import React, { useEffect, useState, useCallback } from "react"
 import { useRouter } from 'next/navigation';
 import { toast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Loader2, SearchIcon, Edit2Icon, FileDown, DeleteIcon } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import axios from "axios";
-
-
+import { ArrowUpIcon, ArrowDownIcon } from "lucide-react"; // Add these imports
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
     SidebarInset,
@@ -81,8 +80,8 @@ export default function CertificateTable() {
     const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
     const [rowsPerPage, setRowsPerPage] = useState(15);
     const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
-        column: "certificateNo",
-        direction: "ascending",
+        column: "createdAt", // or "_id" if createdAt isn't available
+        direction: "descending", // Newest first by default
     });
     const [page, setPage] = React.useState(1);
     const router = useRouter();
@@ -101,30 +100,19 @@ export default function CertificateTable() {
                 }
             );
 
-            // Log the response structure
-            console.log('Full API Response:', {
-                status: response.status,
-                data: response.data,
-                type: typeof response.data,
-                hasData: 'data' in response.data
-            });
-
-            // Handle the response based on its structure
             let certificatesData;
             if (typeof response.data === 'object' && 'data' in response.data) {
-                // Response format: { data: [...certificates] }
                 certificatesData = response.data.data;
             } else if (Array.isArray(response.data)) {
-                // Response format: [...certificates]
                 certificatesData = response.data;
             } else {
-                console.error('Unexpected response format:', response.data);
                 throw new Error('Invalid response format');
             }
 
-            if (!Array.isArray(certificatesData)) {
-                certificatesData = [];
-            }
+            // Sort by createdAt in descending order (newest first)
+            certificatesData.sort((a, b) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
 
             const certificatesWithKeys = certificatesData.map((certificate: Certificate) => ({
                 ...certificate,
@@ -132,15 +120,11 @@ export default function CertificateTable() {
             }));
 
             setCertificates(certificatesWithKeys);
-            setError(null); // Clear any previous errors
+            setError(null);
         } catch (error) {
-            console.error("Error fetching leads:", error);
-            if (axios.isAxiosError(error)) {
-                setError(`Failed to fetch leads: ${error.response?.data?.message || error.message}`);
-            } else {
-                setError("Failed to fetch leads.");
-            }
-            setCertificates([]); // Set empty array on error
+            console.error("Error fetching certificates:", error);
+            setError("Failed to fetch certificates.");
+            setCertificates([]);
         }
     };
 
@@ -176,7 +160,8 @@ export default function CertificateTable() {
                 title: "Error",
                 description: "Failed to delete certificate.",
                 variant: "destructive",
-            });           }
+            });
+        }
     };
 
     const [filterValue, setFilterValue] = useState("");
@@ -212,9 +197,20 @@ export default function CertificateTable() {
 
     const sortedItems = React.useMemo(() => {
         return [...items].sort((a, b) => {
-            const first = a[sortDescriptor.column as keyof Certificate];
-            const second = b[sortDescriptor.column as keyof Certificate];
-            const cmp = first < second ? -1 : first > second ? 1 : 0;
+            // Handle date fields specially
+            if (sortDescriptor.column === 'dateOfCalibration' ||
+                sortDescriptor.column === 'calibrationDueDate' ||
+                sortDescriptor.column === 'createdAt') {
+                const dateA = new Date(a[sortDescriptor.column]).getTime();
+                const dateB = new Date(b[sortDescriptor.column]).getTime();
+                const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+                return sortDescriptor.direction === "descending" ? -cmp : cmp;
+            }
+
+            // Default string/number comparison
+            const first = a[sortDescriptor.column as keyof Certificate] || '';
+            const second = b[sortDescriptor.column as keyof Certificate] || '';
+            const cmp = String(first).localeCompare(String(second));
 
             return sortDescriptor.direction === "descending" ? -cmp : cmp;
         });
@@ -352,15 +348,15 @@ export default function CertificateTable() {
                 </label>
             </div>
         );
-    }, [filterValue, onRowsPerPageChange, certificates.length, onSearchChange,visibleColumns]);
-    
+    }, [filterValue, onRowsPerPageChange, certificates.length, onSearchChange, visibleColumns]);
+
     const bottomContent = React.useMemo(() => {
         return (
             <div className="py-2 px-2 relative flex justify-between items-center">
                 <span className="text-default-400 text-small">
                     Total {certificates.length} certificates
                 </span>
-    
+
                 {/* Centered Pagination */}
                 <div className="absolute left-1/2 transform -translate-x-1/2">
                     <Pagination
@@ -376,7 +372,7 @@ export default function CertificateTable() {
                         }}
                     />
                 </div>
-    
+
                 {/* Navigation Buttons */}
                 <div className="rounded-lg bg-default-100 hover:bg-default-200 hidden sm:flex w-[30%] justify-end gap-2">
                     <Button
@@ -400,8 +396,8 @@ export default function CertificateTable() {
                 </div>
             </div>
         );
-    }, [selectedKeys, page, pages, onPreviousPage, onNextPage, items.length ,hasSearchFilter]);
-    
+    }, [selectedKeys, page, pages, onPreviousPage, onNextPage, items.length, hasSearchFilter]);
+
     const handleSelectionChange = (keys: Selection) => {
         if (keys === "all") {
             setSelectedKeys(new Set(certificates.map(cert => cert._id)));
@@ -444,7 +440,7 @@ export default function CertificateTable() {
                             <Edit2Icon className="h-6 w-6" />
                         </span>
                     </Tooltip>
-    
+
                     <Tooltip>
                         <span
                             className="text-lg text-danger cursor-pointer active:opacity-50"
@@ -458,8 +454,8 @@ export default function CertificateTable() {
         }
         return certificate[columnKey as keyof Certificate];
     }, []);
-    
-    
+
+
     return (
         <SidebarProvider>
             <AdminSidebar />
@@ -493,45 +489,66 @@ export default function CertificateTable() {
                             <CardTitle className="text-3xl font-bold text-center">Certificate Record</CardTitle>
                         </CardHeader>
                         <CardContent>
-                                <Table
-                                    isHeaderSticky
-                                    aria-label="Leads table with custom cells, pagination and sorting"
-                                    bottomContent={bottomContent}
-                                    bottomContentPlacement="outside"
-                                    classNames={{
-                                        wrapper: "max-h-[382px] ower-flow-y-auto",
-                                    }}
-                                    selectedKeys={selectedKeys}
-                                    sortDescriptor={sortDescriptor}
-                                    topContent={topContent}
-                                    topContentPlacement="outside"
-                                    onSelectionChange={handleSelectionChange}
-                                    onSortChange={(descriptor) => {
-                                        setSortDescriptor({
-                                            column: descriptor.column as string,
-                                            direction: descriptor.direction as "ascending" | "descending",
-                                        });
-                                    }}
-                                >
-                                    <TableHeader columns={headerColumns}>
-                                        {(column) => (
-                                            <TableColumn
-                                                key={column.uid}
-                                                align={column.uid === "actions" ? "center" : "start"}
-                                                allowsSorting={column.sortable}
-                                            >
+                            <Table
+                                isHeaderSticky
+                                aria-label="Leads table with custom cells, pagination and sorting"
+                                bottomContent={bottomContent}
+                                bottomContentPlacement="outside"
+                                classNames={{
+                                    wrapper: "max-h-[382px] ower-flow-y-auto",
+                                }}
+                                selectedKeys={selectedKeys}
+                                sortDescriptor={sortDescriptor}
+                                topContent={topContent}
+                                topContentPlacement="outside"
+                                onSelectionChange={handleSelectionChange}
+                                onSortChange={(descriptor) => {
+                                    setSortDescriptor({
+                                        column: descriptor.column as string,
+                                        direction: descriptor.direction as "ascending" | "descending",
+                                    });
+                                }}
+                            >
+                                <TableHeader columns={headerColumns}>
+                                    {(column) => (
+                                        <TableColumn
+                                            key={column.uid}
+                                            align={column.uid === "actions" ? "center" : "start"}
+                                            allowsSorting={column.sortable}
+                                            onClick={() => {
+                                                if (column.sortable) {
+                                                    setSortDescriptor(prev => ({
+                                                        column: column.uid,
+                                                        direction: prev.column === column.uid && prev.direction === 'ascending'
+                                                            ? 'descending'
+                                                            : 'ascending'
+                                                    }));
+                                                }
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-1 cursor-pointer">
                                                 {column.name}
-                                            </TableColumn>
-                                        )}
-                                    </TableHeader>
-                                    <TableBody emptyContent={"No certificate found"} items={sortedItems}>
-                                        {(item) => (
-                                            <TableRow key={item._id}>
-                                                {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Certificate, columnKey as string)}</TableCell>}
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
+                                                {sortDescriptor.column === column.uid && (
+                                                    <span className="ml-1">
+                                                        {sortDescriptor.direction === 'ascending' ? (
+                                                            <ArrowUpIcon className="h-4 w-4" />
+                                                        ) : (
+                                                            <ArrowDownIcon className="h-4 w-4" />
+                                                        )}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </TableColumn>
+                                    )}
+                                </TableHeader>
+                                <TableBody emptyContent={"No certificate found"} items={sortedItems}>
+                                    {(item) => (
+                                        <TableRow key={item._id}>
+                                            {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Certificate, columnKey as string)}</TableCell>}
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
                         </CardContent>
                     </Card>
                 </div>
