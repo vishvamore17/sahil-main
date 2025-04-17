@@ -1,40 +1,30 @@
 const express = require("express");
-const { ServiceController } = require("../../../controller");
 const authenticate = require('../../../middleware/auth');
-const { sendCertificateNotification } = require('../../../controller/serviceController');
+const { ServiceController } = require("../../../controller");
+const { downloadService, sendCertificateNotification } = require('../../../controller/serviceController');
 
 const router = express.Router();
 
 router.get(
-    "/getServices", 
+    "/getServices",
     ServiceController.getServices
 );
-
 router.post(
-    "/generateServices", 
+    "/generateServices",
     ServiceController.createService
 );
-
 router.get(
-    "/download/:serviceId", 
-    ServiceController.downloadService
-);
-
+    "/download/:serviceId",authenticate, downloadService);
 router.put(
-    "/update/:serviceId", 
+    "/updateService/:serviceId",
     ServiceController.updateService
 );
-
 router.delete(
-    "/deleteService/:serviceId", 
+    "/deleteService/:serviceId",
     ServiceController.deleteService
 );
+router.get("/getServiceById/:serviceId",ServiceController.getServiceById);
 
+router.post('/sendMail', authenticate, sendCertificateNotification);
 
-router.get("/getServiceById/:serviceId", 
-    ServiceController.getServiceById);
-
-
-    router.post('/sendMail', authenticate, sendCertificateNotification);
-
-    module.exports = router;
+module.exports = router;

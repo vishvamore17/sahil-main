@@ -1,18 +1,19 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react"
+import React, { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Loader2, SearchIcon, FileDown, ChevronDownIcon } from "lucide-react"
+import { Loader2, SearchIcon, FileDown, Trash2, Download } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow, Selection, ChipProps, Select } from "@heroui/react"
 import axios from "axios";
 import { Pagination, Tooltip } from "@heroui/react"
 import { useRouter } from "next/navigation";
+import { jsPDF } from "jspdf";
 
 interface Service {
-    [x: string]: string | null;
     _id: string;
+    // nameAndLocation: string;
     contactPerson: string;
     contactNumber: string;
     serviceEngineer: string;
@@ -51,8 +52,7 @@ const columns = [
     { name: "Contact Person", uid: "contactPerson", sortable: true, width: "120px" },
     { name: "Contact Number", uid: "contactNumber", sortable: true, width: "120px" },
     { name: "Service Engineer", uid: "serviceEngineer", sortable: true, width: "120px" },
-    { name: "Date", uid: "date", sortable: true, width: "120px" }, // Added date column
-    { name: "Report No", uid: "reportNo", sortable: true, width: "120px" },
+    { name: "Report Number", uid: "reportNo", sortable: true, width: "120px" },
     { name: "Action", uid: "actions", sortable: true, width: "100px" },
 ];
 
@@ -90,45 +90,45 @@ export default function Servicetable() {
 
 
     const fetchServices = async () => {
-            try {
-                const response = await axios.get(
-                    "http://localhost:5000/api/v1/services/getServices",
-                    {
-                        headers: {
-                            "Content-Type": "application/json",
-                            "Authorization": `Bearer ${localStorage.getItem("token")}`
-                        }
+        try {
+            const response = await axios.get(
+                "http://localhost:5000/api/v1/services/getServices",
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${localStorage.getItem("token")}`
                     }
-                );
-    
-                let servicesData;
-                if (typeof response.data === 'object' && 'data' in response.data) {
-                    servicesData = response.data.data;
-                } else if (Array.isArray(response.data)) {
-                    servicesData = response.data;
-                } else {
-                    throw new Error('Invalid response format');
                 }
-    
-                // Sort by createdAt in descending order (newest first)
-                servicesData.sort((a, b) =>
-                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                );
-    
-                const servicesWithKeys = servicesData.map((service: Service) => ({
-                    ...service,
-                    key: service._id || generateUniqueId()
-                }));
-    
-                setServices(servicesWithKeys);
-                setError(null);
-            } catch (error) {
-                console.error("Error fetching services:", error);
-                setError("Failed to fetch services.");
-                setServices([]);
+            );
+
+            let servicesData;
+            if (typeof response.data === 'object' && 'data' in response.data) {
+                servicesData = response.data.data;
+            } else if (Array.isArray(response.data)) {
+                servicesData = response.data;
+            } else {
+                throw new Error('Invalid response format');
             }
-        };
-    
+
+            // Sort by createdAt in descending order (newest first)
+            servicesData.sort((a, b) =>
+                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+            );
+
+            const servicesWithKeys = servicesData.map((service: Service) => ({
+                ...service,
+                key: service._id || generateUniqueId()
+            }));
+
+            setServices(servicesWithKeys);
+            setError(null);
+        } catch (error) {
+            console.error("Error fetching services:", error);
+            setError("Failed to fetch services.");
+            setServices([]);
+        }
+    };
+
     useEffect(() => {
         fetchServices();
     }, []);
@@ -147,8 +147,10 @@ export default function Servicetable() {
 
         if (hasSearchFilter) {
             filteredServices = filteredServices.filter((service) =>
-                // service.nameAndLocation.toLowerCase().includes(filterValue.toLowerCase()) ||
-                service.contactPerson.toLowerCase().includes(filterValue.toLowerCase())
+                service.contactPerson.toLowerCase().includes(filterValue.toLowerCase()) ||
+                service.contactNumber.toLowerCase().includes(filterValue.toLowerCase()) ||
+                service.serviceEngineer.toLowerCase().includes(filterValue.toLowerCase()) ||
+                service.reportNo.toLowerCase().includes(filterValue.toLowerCase())
             );
         }
 
@@ -164,96 +166,162 @@ export default function Servicetable() {
         return filteredItems.slice(start, end);
     }, [page, filteredItems, rowsPerPage]);
 
-      const sortedItems = React.useMemo(() => {
-          return [...items].sort((a, b) => {
-              // Handle date fields specially
-              if (sortDescriptor.column === 'date' || sortDescriptor.column === 'createdAt') {
-                  const dateA = new Date(a[sortDescriptor.column]).getTime();
-                  const dateB = new Date(b[sortDescriptor.column]).getTime();
-                  const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
-                  return sortDescriptor.direction === "descending" ? -cmp : cmp;
-              }
-  
-              // Default string comparison
-              const first = a[sortDescriptor.column as keyof Service] || '';
-              const second = b[sortDescriptor.column as keyof Service] || '';
-              const cmp = String(first).localeCompare(String(second));
-  
-              return sortDescriptor.direction === "descending" ? -cmp : cmp;
-          });
-      }, [sortDescriptor, items]);
+    const sortedItems = React.useMemo(() => {
+        return [...items].sort((a, b) => {
+            // Handle date fields specially
+            if (sortDescriptor.column === 'date' || sortDescriptor.column === 'createdAt') {
+                const dateA = new Date(a[sortDescriptor.column]).getTime();
+                const dateB = new Date(b[sortDescriptor.column]).getTime();
+                const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+                return sortDescriptor.direction === "descending" ? -cmp : cmp;
+            }
+
+            // Default string comparison
+            const first = a[sortDescriptor.column as keyof Service] || '';
+            const second = b[sortDescriptor.column as keyof Service] || '';
+            const cmp = String(first).localeCompare(String(second));
+
+            return sortDescriptor.direction === "descending" ? -cmp : cmp;
+        });
+    }, [sortDescriptor, items]);
 
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
 
     const [isSubmitting, setIsSubmitting] = useState(false)
 
-    const handleDownload = async (serviceId: string) => {
-        try {
-            setIsDownloading(serviceId);
-            console.log('Attempting to download service:', serviceId);
+    const handleDownload = (service: Service) => {
+        const logo = new Image();
+        logo.src = "/img/rps.png";
 
-            // Now download the PDF directly
-            const pdfResponse = await axios.get(
-                `http://localhost:5000/api/v1/services/download/${serviceId}`,
-                {
-                    responseType: 'blob',
-                    headers: {
-                        "Authorization": `Bearer ${localStorage.getItem("token")}`,
-                        "Accept": "application/pdf"
-                    }
-                }
-            );
+        logo.onload = () => {
+            const infoImage = new Image();
+            infoImage.src = "/img/handf.png";
 
-            // Verify the content type
-            const contentType = pdfResponse.headers['content-type'];
-            if (!contentType || !contentType.includes('application/pdf')) {
-                throw new Error('Received invalid content type from server');
-            }
+            infoImage.onload = () => {
+                const doc = new jsPDF();
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
 
-            const blob = new Blob([pdfResponse.data], { type: 'application/pdf' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `service-${serviceId}.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
+                const leftMargin = 15;
+                const rightMargin = 15;
+                const topMargin = 20;
+                let y = topMargin;
 
-            toast({
-                title: "Success",
-                description: "Service downloaded successfully",
-                variant: "default",
-            });
-        } catch (err) {
-            console.error('Download error:', err);
-            let errorMessage = "Failed to download service. Please try again.";
+                const logoWidth = 50;
+                const logoHeight = 15;
+                doc.addImage(logo, "PNG", leftMargin, y, logoWidth, logoHeight);
+                y += logoHeight + 5;
 
-            if (axios.isAxiosError(err)) {
-                console.error('Error details:', {
-                    status: err.response?.status,
-                    data: err.response?.data,
-                    url: err.config?.url
+                const infoImageWidth = 180;
+                const infoImageHeight = 20;
+                doc.addImage(infoImage, "PNG", leftMargin, y, infoImageWidth, infoImageHeight);
+                y += infoImageHeight + 10;
+
+                y += 10;
+
+                doc.setFont("times", "bold").setFontSize(13).setTextColor(0, 51, 153);
+                doc.text("SERVICE / CALIBRATION / INSTALLATION  JOBREPORT", pageWidth / 2, y, { align: "center" });
+                y += 10;
+
+                const addRow = (label: string, value: string) => {
+                    const labelOffset = 65;
+                    doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+                    doc.text(label + ":", leftMargin, y);
+                    doc.setFont("times", "normal").setTextColor(50);
+                    doc.text(value || "N/A", leftMargin + labelOffset, y);
+                    y += 7;
+                };
+
+                addRow("Contact Person", service.contactPerson);
+                addRow("Contact Number", service.contactNumber);
+                addRow("Service Engineer", service.serviceEngineer);
+                addRow("Date", formatDate(service.date));
+                addRow("Place", service.place);
+                addRow("Place Options", service.placeOptions);
+                addRow("Nature of Job", service.natureOfJob);
+                addRow("Report No.", service.reportNo);
+                addRow("Make & Model Number", service.makeModelNumberoftheInstrumentQuantity);
+
+                y += 5;
+                addRow("Calibrated & Tested OK", service.serialNumberoftheInstrumentCalibratedOK);
+                addRow("Sr.No Faulty/Non-Working", service.serialNumberoftheFaultyNonWorkingInstruments);
+
+                y += 10;
+                doc.setDrawColor(0);
+                doc.setLineWidth(0.5);
+                doc.line(leftMargin, y, pageWidth - rightMargin, y);
+
+                doc.addPage();
+                y = topMargin;
+
+                doc.setFont("times", "bold").setFontSize(10).setTextColor(0);
+                doc.text("ENGINEER REMARKS", leftMargin, y);
+                y += 8;
+
+                const tableHeaders = ["Sr. No.", "Service/Spares", "Part No.", "Rate", "Quantity", "PO No."];
+                const colWidths = [20, 60, 25, 25, 25, 25];
+                let x = leftMargin;
+
+                tableHeaders.forEach((header, i) => {
+                    doc.rect(x, y, colWidths[i], 8);
+                    doc.text(header, x + 2, y + 6);
+                    x += colWidths[i];
                 });
 
-                if (err.response?.status === 401) {
-                    errorMessage = "Please login again to download the service.";
-                } else if (err.response?.status === 404) {
-                    errorMessage = "Service not found.";
-                } else if (!navigator.onLine) {
-                    errorMessage = "No internet connection. Please check your network.";
-                }
-            }
+                y += 8;
 
-            toast({
-                title: "Error",
-                description: errorMessage,
-                variant: "destructive",
-            });
-        } finally {
-            setIsDownloading(null);
-        }
+                const engineerRemarks = (service as any).engineerRemarks || [];
+
+                engineerRemarks.forEach((item: any, index: number) => {
+                    x = leftMargin;
+                    const values = [
+                        String(index + 1),
+                        item.serviceSpares || "",
+                        item.partNo || "",
+                        item.rate || "",
+                        item.quantity || "",
+                        item.poNo || ""
+                    ];
+                    values.forEach((val, i) => {
+                        doc.rect(x, y, colWidths[i], 8);
+                        doc.text(val, x + 2, y + 6);
+                        x += colWidths[i];
+                    });
+                    y += 8;
+
+                    if (y + 20 > pageHeight) {
+                        doc.addPage();
+                        y = topMargin;
+                    }
+                });
+
+                y += 10;
+                doc.setFont("times", "normal");
+                doc.text("Service Engineer", pageWidth - rightMargin - 40, y);
+                doc.text(service.serviceEngineer || "", pageWidth - rightMargin - 40, y + 5);
+
+                const now = new Date();
+                const pad = (n: number) => n.toString().padStart(2, "0");
+                const date = `${pad(now.getDate())}-${pad(now.getMonth() + 1)}-${now.getFullYear()}`;
+                const time = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+                const printDateTime = `${date} ${time}`;
+                doc.setFontSize(9).setTextColor(100);
+                doc.text(`Report Generated On: ${printDateTime}`, leftMargin, pageHeight - 10);
+
+                doc.save(`service-${service.reportNo || service._id}.pdf`);
+            };
+
+            infoImage.onerror = () => {
+                console.error("Failed to load company info image.");
+                alert("Company info image not found. Please check the path.");
+            };
+        };
+
+        logo.onerror = () => {
+            console.error("Failed to load logo image.");
+            alert("Logo image not found. Please check the path.");
+        };
     };
 
 
@@ -294,7 +362,7 @@ export default function Servicetable() {
                 <Input
                     isClearable
                     className="w-full max-w-[300px]"
-                    placeholder="Search by name or GST"
+                    placeholder="Search"
                     startContent={<SearchIcon className="h-4 w-5 text-muted-foreground" />}
                     value={filterValue}
                     onChange={(e) => setFilterValue(e.target.value)}
@@ -376,27 +444,37 @@ export default function Servicetable() {
         setVisibleColumns(keys);
     };
 
-    const renderCell = useCallback((service: Service, columnKey: string) => {
+    const renderCell = React.useCallback((service: Service, columnKey: string): React.ReactNode => {
+        const cellValue = service[columnKey as keyof Service];
+
+        if ((columnKey === "dateOfCalibration" || columnKey === "calibrationDueDate") && cellValue) {
+            return formatDate(cellValue);
+        }
+
         if (columnKey === "actions") {
             return (
                 <div className="relative flex items-center gap-2">
-                    <Tooltip>
-                        <span
+                    <Tooltip content="Download Report">
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             className="text-lg text-danger cursor-pointer active:opacity-50"
-                            onClick={() => handleDownload(service._id)}
-                        > {isDownloading === service.serviceId ? (
-                            <Loader2 className="h-6 w-6 animate-spin" />
-                        ) : (
-                            <FileDown className="h-6 w-6" />
-                        )}
-                        </span>
+                            onClick={() => handleDownload(service)}
+                            disabled={isDownloading === service._id}
+                        >
+                            {isDownloading === service._id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Download className="h-6 w-6" />
+                            )}
+                        </Button>
                     </Tooltip>
                 </div>
             );
         }
-        return service[columnKey as keyof Service];
-    }, []);
 
+        return cellValue;
+    }, [handleDownload]);
 
     return (
         <Table
@@ -419,33 +497,33 @@ export default function Servicetable() {
                 });
             }}
         >
-             <TableHeader columns={headerColumns}>
-                                                {(column) => (
-                                                    <TableColumn
-                                                        key={column.uid}
-                                                        align={column.uid === "actions" ? "center" : "start"}
-                                                        allowsSorting={column.sortable}
-                                                        onClick={() => {
-                                                            setSortDescriptor(prev => ({
-                                                                column: column.uid,
-                                                                direction: prev.column === column.uid && prev.direction === 'ascending'
-                                                                    ? 'descending'
-                                                                    : 'ascending'
-                                                            }));
-                                                        }}
-                                                    >
-                                                        <div className="flex items-center">
-                                                            {column.name}
-                                                            {sortDescriptor.column === column.uid && (
-                                                                <span className="ml-1">
-                                                                    {sortDescriptor.direction === 'ascending' ? '↑' : '↓'}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </TableColumn>
-                                                )}
-                                            </TableHeader>
-            <TableBody emptyContent={"No service found"} items={sortedItems}>
+            <TableHeader columns={headerColumns}>
+                {(column) => (
+                    <TableColumn
+                        key={column.uid}
+                        align={column.uid === "actions" ? "center" : "start"}
+                        allowsSorting={column.sortable}
+                        onClick={() => {
+                            setSortDescriptor(prev => ({
+                                column: column.uid,
+                                direction: prev.column === column.uid && prev.direction === 'ascending'
+                                    ? 'descending'
+                                    : 'ascending'
+                            }));
+                        }}
+                    >
+                        <div className="flex items-center">
+                            {column.name}
+                            {sortDescriptor.column === column.uid && (
+                                <span className="ml-1">
+                                    {sortDescriptor.direction === 'ascending' ? '↑' : '↓'}
+                                </span>
+                            )}
+                        </div>
+                    </TableColumn>
+                )}
+            </TableHeader>
+            <TableBody emptyContent={"Create Service and add data"} items={sortedItems}>
                 {(item) => (
                     <TableRow key={item._id}>
                         {(columnKey) => <TableCell style={{ fontSize: "12px", padding: "8px" }}>{renderCell(item as Service, columnKey as string)}</TableCell>}
@@ -453,7 +531,5 @@ export default function Servicetable() {
                 )}
             </TableBody>
         </Table>
-
-
     );
 }
